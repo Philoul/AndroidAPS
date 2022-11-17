@@ -4,8 +4,11 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.os.Bundle
 import android.util.DisplayMetrics
+import android.view.Menu
+import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
+import android.widget.PopupMenu
 import android.widget.RelativeLayout
 import android.widget.TextView
 import app.aaps.core.data.time.T
@@ -126,6 +129,25 @@ class HistoryBrowseActivity : TranslatedDaggerAppCompatActivity() {
                     }
                 }
                 .show(supportFragmentManager, "history_date_picker")
+        }
+
+        binding.chartMenuButton.setOnLongClickListener { v: View ->
+            val popup = PopupMenu(v.context, v)
+            popup.menu.add(Menu.NONE, 6, Menu.NONE, rh.gq(app.aaps.core.ui.R.plurals.hours, 6, 6))
+            popup.menu.add(Menu.NONE, 12, Menu.NONE, rh.gq(app.aaps.core.ui.R.plurals.hours, 12, 12))
+            popup.menu.add(Menu.NONE, 18, Menu.NONE, rh.gq(app.aaps.core.ui.R.plurals.hours, 18, 18))
+            popup.menu.add(Menu.NONE, 24, Menu.NONE, rh.gq(app.aaps.core.ui.R.plurals.hours, 24, 24))
+            popup.setOnMenuItemClickListener {
+                // id == Range to display ...
+                rangeToDisplay = it.itemId
+                setTime(historyBrowserData.overviewData.fromTime)
+                loadAll("rangeChange")
+                return@setOnMenuItemClickListener true
+            }
+            binding.chartMenuButton.setImageResource(app.aaps.plugins.main.R.drawable.ic_arrow_drop_up_white_24dp)
+            popup.setOnDismissListener { binding.chartMenuButton.setImageResource(app.aaps.plugins.main.R.drawable.ic_arrow_drop_down_white_24dp) }
+            popup.show()
+            false
         }
 
         val dm = DisplayMetrics()
