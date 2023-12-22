@@ -73,6 +73,23 @@
             android:key="@string/key_insight_disconnect_delay"
             android:title="@string/disconnect_delay" />
 
+        <androidx.preference.PreferenceScreen
+            android:key="insight_advanced"
+            android:title="@string/advanced_settings_title">
+
+            <Preference
+                android:summary="@string/typeinsulin_summary">
+            </Preference>
+
+            <ListPreference
+                android:defaultValue="U100"
+                android:entries="@array/typeInsulinArray"
+                android:entryValues="@array/typeInsulinValues"
+                android:key="@string/key_typeinsulin"
+                android:title="@string/typeinsulin_title" />
+
+        </androidx.preference.PreferenceScreen>
+
     </PreferenceCategory>
 
 </androidx.preference.PreferenceScreen>
