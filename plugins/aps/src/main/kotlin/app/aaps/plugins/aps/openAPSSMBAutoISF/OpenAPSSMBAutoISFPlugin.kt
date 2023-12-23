@@ -14,13 +14,11 @@ import app.aaps.core.interfaces.iob.GlucoseStatusProvider
 import app.aaps.core.interfaces.iob.IobCobCalculator
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.maintenance.ImportExportPrefs
-import app.aaps.core.interfaces.notifications.Notification
 import app.aaps.core.interfaces.plugin.ActivePlugin
 import app.aaps.core.interfaces.profile.ProfileFunction
 import app.aaps.core.interfaces.profiling.Profiler
 import app.aaps.core.interfaces.resources.ResourceHelper
 import app.aaps.core.interfaces.rx.bus.RxBus
-import app.aaps.core.interfaces.sharedPreferences.SP
 import app.aaps.core.interfaces.stats.TddCalculator
 import app.aaps.core.interfaces.ui.UiInteraction
 import app.aaps.core.interfaces.utils.DateUtil
@@ -28,7 +26,6 @@ import app.aaps.core.interfaces.utils.HardLimits
 import app.aaps.core.keys.BooleanKey
 import app.aaps.core.keys.Preferences
 import app.aaps.plugins.aps.R
-import app.aaps.plugins.aps.openAPSSMB.DetermineBasalAdapterSMBJS
 import app.aaps.plugins.aps.openAPSSMB.OpenAPSSMBPlugin
 import app.aaps.plugins.aps.utils.ScriptReader
 import dagger.android.HasAndroidInjector
@@ -49,7 +46,6 @@ class OpenAPSSMBAutoISFPlugin @Inject constructor(
     processedTbrEbData: ProcessedTbrEbData,
     hardLimits: HardLimits,
     profiler: Profiler,
-    sp: SP,
     private val preferences: Preferences,
     dateUtil: DateUtil,
     persistenceLayer: PersistenceLayer,
@@ -57,8 +53,7 @@ class OpenAPSSMBAutoISFPlugin @Inject constructor(
     bgQualityCheck: BgQualityCheck,
     tddCalculator: TddCalculator,
     importExportPrefs: ImportExportPrefs,
-    private val uiInteraction: UiInteraction,
-    private val config: Config,
+    config: Config,
     private val objectives: Objectives
 ) : OpenAPSSMBPlugin(
     injector,
@@ -73,14 +68,14 @@ class OpenAPSSMBAutoISFPlugin @Inject constructor(
     processedTbrEbData,
     hardLimits,
     profiler,
-    sp,
     preferences,
     dateUtil,
     persistenceLayer,
     glucoseStatusProvider,
     bgQualityCheck,
     tddCalculator,
-    importExportPrefs
+    importExportPrefs,
+    config
 ) {
 
     init {
