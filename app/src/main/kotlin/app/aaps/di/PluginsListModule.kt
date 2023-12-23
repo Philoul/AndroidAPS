@@ -46,8 +46,8 @@ import app.aaps.plugins.source.PoctechPlugin
 import app.aaps.plugins.source.RandomBgPlugin
 import app.aaps.plugins.source.TomatoPlugin
 import app.aaps.plugins.source.XdripSourcePlugin
-import app.aaps.plugins.sync.dataBroadcaster.DataBroadcastPlugin
 import app.aaps.plugins.sync.garmin.GarminPlugin
+import app.aaps.plugins.sync.tizen.TizenPlugin
 import app.aaps.plugins.sync.nsclient.NSClientPlugin
 import app.aaps.plugins.sync.nsclientV3.NSClientV3Plugin
 import app.aaps.plugins.sync.openhumans.OpenHumansUploaderPlugin
@@ -58,6 +58,7 @@ import app.aaps.pump.danar.DanaRPlugin
 import app.aaps.pump.danarkorean.DanaRKoreanPlugin
 import app.aaps.pump.danars.DanaRSPlugin
 import app.aaps.pump.danarv2.DanaRv2Plugin
+import app.aaps.pump.equil.EquilPumpPlugin
 import app.aaps.pump.insight.InsightPlugin
 import app.aaps.pump.virtual.VirtualPumpPlugin
 import dagger.Binds
@@ -219,6 +220,12 @@ abstract class PluginsListModule {
     @AllConfigs
     @IntoMap
     @IntKey(170)
+    abstract fun bindEquilPumpPlugin(plugin: EquilPumpPlugin): PluginBase
+
+    @Binds
+    @AllConfigs
+    @IntoMap
+    @IntKey(180)
     abstract fun bindVirtualPumpPlugin(plugin: VirtualPumpPlugin): PluginBase
 
     @Binds
@@ -351,7 +358,7 @@ abstract class PluginsListModule {
     @AllConfigs
     @IntoMap
     @IntKey(368)
-    abstract fun bindDataBroadcastPlugin(plugin: DataBroadcastPlugin): PluginBase
+    abstract fun bindDataBroadcastPlugin(plugin: TizenPlugin): PluginBase
 
     @Binds
     @AllConfigs

@@ -32,6 +32,7 @@ enum class DoubleKey(
     AbsorptionMaxTime(R.string.key_absorption_maxtime, 6.0, 4.0, 10.0),
     AutosensMin(R.string.key_openaps_autosens_min, 0.7, 0.1, 1.0, defaultedBySM = true, hideParentScreenIfHidden = true),
     AutosensMax(R.string.key_openaps_autosens_max, 1.2, 0.5, 3.0, defaultedBySM = true),
+    EquilMaxBolus(R.string.key_equil_maxbolus, 10.0, 0.1, 25.0),
     ApsAutoIsfMin(R.string.key_openapsama_autoISF_min, 1.0, 0.3, 1.0),
     ApsAutoIsfMax(R.string.key_openapsama_autoISF_max, 1.0, 1.0, 5.0),
     ApsAutoIsfBgAccelWeight(R.string.key_openapsama_bgAccel_ISF_weight, 0.0, 0.0, 1.0),

@@ -10,6 +10,7 @@ import app.aaps.core.data.plugin.PluginType
 import app.aaps.core.interfaces.aps.APS
 import app.aaps.core.interfaces.aps.DetermineBasalAdapter
 import app.aaps.core.interfaces.bgQualityCheck.BgQualityCheck
+import app.aaps.core.interfaces.configuration.Config
 import app.aaps.core.interfaces.constraints.Constraint
 import app.aaps.core.interfaces.constraints.ConstraintsChecker
 import app.aaps.core.interfaces.constraints.PluginConstraints
@@ -67,14 +68,14 @@ open class OpenAPSSMBPlugin @Inject constructor(
     private val processedTbrEbData: ProcessedTbrEbData,
     private val hardLimits: HardLimits,
     private val profiler: Profiler,
-    private val sp: SP,
     private val preferences: Preferences,
     protected val dateUtil: DateUtil,
     private val persistenceLayer: PersistenceLayer,
     private val glucoseStatusProvider: GlucoseStatusProvider,
     private val bgQualityCheck: BgQualityCheck,
     private val tddCalculator: TddCalculator,
-    private val importExportPrefs: ImportExportPrefs
+    private val importExportPrefs: ImportExportPrefs,
+    private val config: Config
 ) : PluginBase(
     PluginDescription()
         .mainType(PluginType.APS)
@@ -308,6 +309,7 @@ open class OpenAPSSMBPlugin @Inject constructor(
                 lastDetermineBasalAdapter = determineBasalAdapterSMBJS
                 lastAPSResult = determineBasalResultSMB as DetermineBasalResultSMB
                 lastAPSRun = now
+                if (config.isUnfinishedMode())
                 importExportPrefs.exportApsResult(
                     when (determineBasalAdapterSMBJS) {
                         is DetermineBasalAdapterSMBJS -> OpenAPSSMBPlugin::class.simpleName
