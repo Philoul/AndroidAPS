@@ -6,17 +6,17 @@ import app.aaps.core.data.iob.GlucoseStatus
 import app.aaps.core.data.iob.IobTotal
 import app.aaps.core.data.iob.MealData
 import app.aaps.core.data.model.GlucoseUnit
+import app.aaps.core.interfaces.aps.APSResult
 import app.aaps.core.interfaces.aps.DetermineBasalAdapter
+import app.aaps.core.interfaces.constraints.ConstraintsChecker
 import app.aaps.core.interfaces.db.ProcessedTbrEbData
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
 import app.aaps.core.interfaces.plugin.ActivePlugin
 import app.aaps.core.interfaces.profile.Profile
 import app.aaps.core.interfaces.profile.ProfileFunction
-import app.aaps.core.interfaces.profile.ProfileUtil
 import app.aaps.core.interfaces.sharedPreferences.SP
 import app.aaps.core.interfaces.utils.DateUtil
-import app.aaps.core.interfaces.utils.Round
 import app.aaps.core.keys.BooleanKey
 import app.aaps.core.keys.DoubleKey
 import app.aaps.core.keys.IntKey
@@ -44,19 +44,19 @@ import org.mozilla.javascript.Undefined
 import java.io.IOException
 import java.lang.reflect.InvocationTargetException
 import java.nio.charset.StandardCharsets
-import java.security.InvalidParameterException
 import javax.inject.Inject
-import kotlin.math.ln
+import app.aaps.core.objects.profile.ProfileSealed
+
 
 class DetermineBasalAdapterSMBAutoISFJS(private val scriptReader: ScriptReader, private val injector: HasAndroidInjector) : DetermineBasalAdapter {
 
     @Inject lateinit var aapsLogger: AAPSLogger
+    @Inject lateinit var constraintChecker: ConstraintsChecker
     @Inject lateinit var sp: SP
     @Inject lateinit var preferences: Preferences
     @Inject lateinit var profileFunction: ProfileFunction
     @Inject lateinit var processedTbrEbData: ProcessedTbrEbData
     @Inject lateinit var activePlugin: ActivePlugin
-    @Inject lateinit var profileUtil: ProfileUtil
     @Inject lateinit var dateUtil: DateUtil
 
     @VisibleForTesting var profile = JSONObject()
@@ -69,11 +69,6 @@ class DetermineBasalAdapterSMBAutoISFJS(private val scriptReader: ScriptReader, 
     @VisibleForTesting var smbAlwaysAllowed = false
     @VisibleForTesting var currentTime: Long = 0
     @VisibleForTesting var flatBGsDetected = false
-    @VisibleForTesting var tdd1D: Double? = null
-    @VisibleForTesting var tdd7D: Double? = null
-    @VisibleForTesting var tddLast24H: Double? = null
-    @VisibleForTesting var tddLast4H: Double? = null
-    @VisibleForTesting var tddLast8to4H: Double? = null
 
     override var currentTempParam: String? = null
     override var iobDataParam: String? = null
@@ -94,11 +89,6 @@ class DetermineBasalAdapterSMBAutoISFJS(private val scriptReader: ScriptReader, 
         put("reservoir_data", null)
         put("currentTime", currentTime)
         put("flatBGsDetected", flatBGsDetected)
-        put("tdd1D", tdd1D)
-        put("tdd7D", tdd7D)
-        put("tddLast24H", tddLast24H)
-        put("tddLast4H", tddLast4H)
-        put("tddLast8to4H", tddLast8to4H)
     }
 
     @Suppress("SpellCheckingInspection")
@@ -216,12 +206,6 @@ class DetermineBasalAdapterSMBAutoISFJS(private val scriptReader: ScriptReader, 
         tddLast4H: Double?,
         tddLast8to4H: Double?
     ) {
-        this.tdd1D = tdd1D ?: throw InvalidParameterException()
-        this.tdd7D = tdd7D ?: throw InvalidParameterException()
-        this.tddLast24H = tddLast24H ?: throw InvalidParameterException()
-        this.tddLast4H = tddLast4H ?: throw InvalidParameterException()
-        this.tddLast8to4H = tddLast8to4H ?: throw InvalidParameterException()
-
         val pump = activePlugin.activePump
         val pumpBolusStep = pump.pumpDescription.bolusStep
         this.profile.put("max_iob", maxIob)
@@ -236,20 +220,16 @@ class DetermineBasalAdapterSMBAutoISFJS(private val scriptReader: ScriptReader, 
         this.profile.put("sens", profile.getIsfMgdl())
         this.profile.put("max_daily_safety_multiplier", preferences.get(DoubleKey.ApsMaxDailyMultiplier))
         this.profile.put("current_basal_safety_multiplier", preferences.get(DoubleKey.ApsMaxCurrentBasalMultiplier))
-        this.profile.put("lgsThreshold", profileUtil.convertToMgdlDetect(preferences.get(UnitDoubleKey.ApsLgsThreshold)))
 
+        this.profile.put("high_temptarget_raises_sensitivity",preferences.get(BooleanKey.ApsAutoIsfHighTtRaisesSens))
         //mProfile.put("high_temptarget_raises_sensitivity", SP.getBoolean(R.string.key_high_temptarget_raises_sensitivity, SMBDefaults.high_temptarget_raises_sensitivity));
-        this.profile.put(
-            "high_temptarget_raises_sensitivity",
-            sp.getBoolean(app.aaps.core.utils.R.string.key_high_temptarget_raises_sensitivity, SMBDefaults.high_temptarget_raises_sensitivity)
-        )
+        this.profile.put("low_temptarget_lowers_sensitivity", preferences.get(BooleanKey.ApsAutoIsfLowTtLowersSens))
         //mProfile.put("low_temptarget_lowers_sensitivity", SP.getBoolean(R.string.key_low_temptarget_lowers_sensitivity, SMBDefaults.low_temptarget_lowers_sensitivity));
-        this.profile.put("low_temptarget_lowers_sensitivity", sp.getBoolean(app.aaps.core.utils.R.string.key_low_temptarget_lowers_sensitivity, SMBDefaults.low_temptarget_lowers_sensitivity))
         this.profile.put("sensitivity_raises_target", preferences.get(BooleanKey.ApsSensitivityRaisesTarget))
         this.profile.put("resistance_lowers_target", preferences.get(BooleanKey.ApsResistanceLowersTarget))
         this.profile.put("adv_target_adjustments", SMBDefaults.adv_target_adjustments)
-        this.profile.put("exercise_mode", SMBDefaults.exercise_mode)
-        this.profile.put("half_basal_exercise_target", SMBDefaults.half_basal_exercise_target)
+        this.profile.put("exercise_mode", sp.getBoolean(app.aaps.core.utils.R.string.key_high_temptarget_raises_sensitivity, SMBDefaults.high_temptarget_raises_sensitivity))
+        this.profile.put("half_basal_exercise_target", preferences.get(UnitDoubleKey.ApsAutoIsfHalfBasalExerciseTarget))
         this.profile.put("maxCOB", SMBDefaults.maxCOB)
         this.profile.put("skip_neutral_temps", pump.setNeutralTempAtFullHour())
         // min_5m_carbimpact is not used within SMB determinebasal
@@ -277,10 +257,36 @@ class DetermineBasalAdapterSMBAutoISFJS(private val scriptReader: ScriptReader, 
         this.profile.put("temptargetSet", tempTargetSet)
         this.profile.put("autosens_max", preferences.get(DoubleKey.AutosensMax))
         this.profile.put("autosens_min", preferences.get(DoubleKey.AutosensMin))
-        //set the min SMB amount to be the amount set by the pump.
         if (profileFunction.getUnits() == GlucoseUnit.MMOL) {
             this.profile.put("out_units", "mmol/L")
         }
+
+        // mod use autoisf here
+        this.profile.put("autoISF_version", "3.0")        // was BuildConfig.AUTOISF_VERSION)
+        this.profile.put("enable_autoISF", preferences.get(BooleanKey.ApsUseAutoIsf))
+        this.profile.put("autoISF_max",  preferences.get(DoubleKey.ApsAutoIsfMax))
+        this.profile.put("autoISF_min",  preferences.get(DoubleKey.ApsAutoIsfMin))
+        this.profile.put("bgAccel_ISF_weight",  preferences.get(DoubleKey.ApsAutoIsfBgAccelWeight))
+        this.profile.put("bgBrake_ISF_weight",  preferences.get(DoubleKey.ApsAutoIsfBgBrakeWeight))
+        this.profile.put("enable_pp_ISF_always",  preferences.get(BooleanKey.ApsAutoIsfPpAlways))
+        this.profile.put("pp_ISF_hours",  preferences.get(IntKey.ApsAutoIsfPpIsfHours))
+        this.profile.put("pp_ISF_weight", preferences.get(DoubleKey.ApsAutoIsfPpWeight))
+        this.profile.put("delta_ISFrange_weight",  preferences.get(DoubleKey.ApsAutoIsfDeltaWeight))
+        this.profile.put("lower_ISFrange_weight",  preferences.get(DoubleKey.ApsAutoIsfLowBgWeight))
+        this.profile.put("higher_ISFrange_weight",  preferences.get(DoubleKey.ApsAutoIsfHighBgWeight))
+        this.profile.put("enable_dura_ISF_with_COB", preferences.get(BooleanKey.ApsAutoIsfDuraAfterCarbs))
+        this.profile.put("dura_ISF_weight",  preferences.get(DoubleKey.ApsAutoIsfDuraWeight))
+        // include SMB adaptations
+        this.profile.put("smb_delivery_ratio", preferences.get(DoubleKey.ApsAutoIsfSmbDeliveryRatio))
+        this.profile.put("smb_delivery_ratio_min", preferences.get(DoubleKey.ApsAutoIsfSmbDeliveryRatioMin))
+        this.profile.put("smb_delivery_ratio_max", preferences.get(DoubleKey.ApsAutoIsfSmbDeliveryRatioMax))
+        this.profile.put("smb_delivery_ratio_bg_range", preferences.get(UnitDoubleKey.ApsAutoIsfSmbDeliveryRatioBgRange))
+        this.profile.put("smb_max_range_extension", preferences.get(DoubleKey.ApsAutoIsfSmbMaxRangeExtension))
+        this.profile.put("enableSMB_EvenOn_OddOff", preferences.get(BooleanKey.ApsAutoIsfSmbOnEvenTt))          // temp target
+        this.profile.put("enableSMB_EvenOn_OddOff_always",  preferences.get(BooleanKey.ApsAutoIsfSmbOnEvenPt))  // profile target
+        this.profile.put("iob_threshold_percent", preferences.get(IntKey.ApsAutoIsfIobThPercent))
+        this.profile.put("profile_percentage", if (profile is ProfileSealed.EPS) profile.value.originalPercentage else 100)
+
         val now = System.currentTimeMillis()
         val tb = processedTbrEbData.getTempBasalIncludingConvertedExtended(now)
         currentTemp.put("temp", "absolute")
@@ -297,41 +303,30 @@ class DetermineBasalAdapterSMBAutoISFJS(private val scriptReader: ScriptReader, 
         } else {
             this.glucoseStatus.put("delta", glucoseStatus.delta)
         }
-
         this.glucoseStatus.put("short_avgdelta", glucoseStatus.shortAvgDelta)
         this.glucoseStatus.put("long_avgdelta", glucoseStatus.longAvgDelta)
         this.glucoseStatus.put("date", glucoseStatus.date)
+        this.glucoseStatus.put("dura_ISF_minutes", glucoseStatus.duraISFminutes)
+        this.glucoseStatus.put("dura_ISF_average", glucoseStatus.duraISFaverage)
+        this.glucoseStatus.put("parabola_fit_correlation", glucoseStatus.corrSqu)
+        this.glucoseStatus.put("parabola_fit_minutes", glucoseStatus.parabolaMinutes)
+        this.glucoseStatus.put("parabola_fit_last_delta", glucoseStatus.deltaPl)
+        this.glucoseStatus.put("parabola_fit_next_delta", glucoseStatus.deltaPn)
+        this.glucoseStatus.put("parabola_fit_a0", glucoseStatus.a0)
+        this.glucoseStatus.put("parabola_fit_a1", glucoseStatus.a1)
+        this.glucoseStatus.put("parabola_fit_a2", glucoseStatus.a2)
+        this.glucoseStatus.put("bg_acceleration", glucoseStatus.bgAcceleration)
         this.mealData.put("carbs", mealData.carbs)
         this.mealData.put("mealCOB", mealData.mealCOB)
         this.mealData.put("slopeFromMaxDeviation", mealData.slopeFromMaxDeviation)
         this.mealData.put("slopeFromMinDeviation", mealData.slopeFromMinDeviation)
         this.mealData.put("lastBolusTime", mealData.lastBolusTime)
         this.mealData.put("lastCarbTime", mealData.lastCarbTime)
-
-        val insulin = activePlugin.activeInsulin
-        val insulinDivisor = when {
-            insulin.peak > 65 -> 55 // lyumjev peak: 45
-            insulin.peak > 50 -> 65 // ultra rapid peak: 55
-            else              -> 75 // rapid peak: 75
-        }
-
-        val tddWeightedFromLast8H = ((1.4 * tddLast4H) + (0.6 * tddLast8to4H)) * 3
-        var tdd = (tddWeightedFromLast8H * 0.33) + (tdd7D * 0.34) + (tdd1D * 0.33)
-        val dynISFadjust = preferences.get(IntKey.ApsDynIsfAdjustmentFactor) / 100.0
-        tdd *= dynISFadjust
-
-        val variableSensitivity = Round.roundTo(1800 / (tdd * (ln((glucoseStatus.glucose / insulinDivisor) + 1))), 0.1)
-
-        this.profile.put("variable_sens", variableSensitivity)
-        this.profile.put("insulinDivisor", insulinDivisor)
-        this.profile.put("TDD", tdd)
-
-
-        if (preferences.get(BooleanKey.ApsDynIsfAdjustSensitivity))
-            autosensData.put("ratio", tddLast24H / tdd7D)
-        else
+        if (constraintChecker.isAutosensModeEnabled().value()) {
+            autosensData.put("ratio", autosensDataRatio)
+        } else {
             autosensData.put("ratio", 1.0)
-
+        }
         this.microBolusAllowed = microBolusAllowed
         smbAlwaysAllowed = advancedFiltering
         currentTime = now
