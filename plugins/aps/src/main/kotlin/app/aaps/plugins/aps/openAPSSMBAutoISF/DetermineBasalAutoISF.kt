@@ -203,9 +203,9 @@ class DetermineBasalAutoISF @Inject constructor(
         val max_iob = profile.max_iob // maximum amount of non-bolus IOB OpenAPS will ever deliver
 
         // if min and max are set, then set target to their average
-        var target_bg = (profile.min_bg + profile.max_bg) / 2
-        var min_bg = profile.min_bg
-        var max_bg = profile.max_bg
+        var target_bg = ((profile.min_bg + profile.max_bg) / 2).toInt()
+        var min_bg = profile.min_bg.toInt()
+        var max_bg = profile.max_bg.toInt()
 
         var sensitivityRatio: Double
         val high_temptarget_raises_sensitivity = profile.exercise_mode || profile.high_temptarget_raises_sensitivity
@@ -343,7 +343,7 @@ class DetermineBasalAutoISF @Inject constructor(
             bg = bg,
             tick = tick,
             eventualBG = eventualBG,
-            targetBG = target_bg,
+            targetBG = target_bg.toDouble(),
             insulinReq = 0.0,
             deliverAt = deliverAt, // The time at which the microbolus should be delivered
             sensitivityRatio = sensitivityRatio, // autosens ratio (fraction of normal basal)

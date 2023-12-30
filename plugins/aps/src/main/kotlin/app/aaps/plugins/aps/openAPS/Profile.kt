@@ -43,7 +43,30 @@ data class Profile(
     var autosens_max: Double,
     var autosens_min: Double?,
     var out_units: String,
-    var variable_sens: Double?, //DynISF only
+    var variable_sens: Double?, //DynISF + AutoISF only
     var insulinDivisor: Int?, //DynISF only
-    var TDD: Double? //DynISF only
+    var TDD: Double?, //DynISF only
+    var autoISF_version: String? = null, // AutoISF only ... from here and downwards
+    var enable_autoISF: Boolean? = null,
+    var autoISF_max: Double? = null,
+    var autoISF_min: Double? = null,
+    var bgAccel_ISF_weight: Double? = null,
+    var bgBrake_ISF_weight: Double? = null,
+    var enable_pp_ISF_always: Boolean? = null,
+    var pp_ISF_hours: Int? = null,
+    var pp_ISF_weight: Double? = null,
+    var delta_ISFrange_weight: Double? = null,
+    var lower_ISFrange_weight: Double? = null,
+    var higher_ISFrange_weight: Double? = null,
+    var enable_dura_ISF_with_COB: Boolean? = null,
+    var dura_ISF_weight: Double? = null,
+    var smb_delivery_ratio: Double? = null,
+    var smb_delivery_ratio_min: Double? = null,
+    var smb_delivery_ratio_max: Double? = null,
+    var smb_delivery_ratio_bg_range: Double? = null,
+    var smb_max_range_extension: Double? = null,
+    var enableSMB_EvenOn_OddOff: Boolean? = null,
+    var enableSMB_EvenOn_OddOff_always: Boolean? = null,
+    var iob_threshold_percent: Int? = null,
+    var profile_percentage: Int? = null // end of AutoISF only
 )
