@@ -70,6 +70,7 @@ class ReplayApsResultsTest @Inject constructor() {
         var amas = 0
         var smbs = 0
         var dynisfs = 0
+        var autoisfs = 0
         val results = readResultFiles()
         assertThat(results.size).isGreaterThan(0)
         results.forEach { test ->
@@ -85,6 +86,7 @@ class ReplayApsResultsTest @Inject constructor() {
                 OpenAPSSMBPlugin::class.simpleName           -> smbs++
                 OpenAPSSMBDynamicISFPlugin::class.simpleName -> dynisfs++
                 OpenAPSAMAPlugin::class.simpleName           -> amas++
+                OpenAPSSMBAutoISFPlugin::class.simpleName    -> autoisfs++
             }
             when (algorithm) {
                 OpenAPSSMBPlugin::class.simpleName           -> testOpenAPSSMB(filename, input, output, context, injector)
@@ -93,7 +95,7 @@ class ReplayApsResultsTest @Inject constructor() {
                 OpenAPSSMBAutoISFPlugin::class.simpleName    -> testOpenAPSAutoISF(filename, input, output, context, injector)
             }
         }
-        aapsLogger.info(LTag.CORE, "\n**********\nAMA: $amas\nSMB: $smbs\nDynISFs: $dynisfs\n**********")
+        aapsLogger.info(LTag.CORE, "\n**********\nAMA: $amas\nSMB: $smbs\nDynISFs: $dynisfs\nAutoISFs: $autoisfs\n**********")
     }
 
     private fun testOpenAPSSMB(filename: String, input: JSONObject, output: JSONObject, context: Context, injector: HasAndroidInjector) {
@@ -136,7 +138,14 @@ class ReplayApsResultsTest @Inject constructor() {
             delta = determineBasalResult.glucoseStatus.getDouble("delta"),
             short_avgdelta = determineBasalResult.glucoseStatus.getDouble("short_avgdelta"),
             long_avgdelta = determineBasalResult.glucoseStatus.getDouble("long_avgdelta"),
-            date = determineBasalResult.glucoseStatus.getLong("date")
+            date = determineBasalResult.glucoseStatus.getLong("date"),
+            duraISFminutes = null,
+            duraISFaverage = null,
+            bgAcceleration = null,
+            a0 = null,
+            a1 = null,
+            a2 = null,
+            corrSqu = null
         )
         val currenttemp = CurrentTemp(
             duration = determineBasalResult.currentTemp.getInt("duration"),
@@ -207,7 +216,30 @@ class ReplayApsResultsTest @Inject constructor() {
             out_units = determineBasalResult.profile.optString("out_units"),
             variable_sens = null,
             insulinDivisor = null,
-            TDD = null
+            TDD = null,
+            autoISF_version = null,
+            enable_autoISF = null,
+            autoISF_max = null,
+            autoISF_min = null,
+            bgAccel_ISF_weight = null,
+            bgBrake_ISF_weight = null,
+            enable_pp_ISF_always = null,
+            pp_ISF_hours = null,
+            pp_ISF_weight = null,
+            delta_ISFrange_weight = null,
+            lower_ISFrange_weight = null,
+            higher_ISFrange_weight = null,
+            enable_dura_ISF_with_COB = null,
+            dura_ISF_weight = null,
+            smb_delivery_ratio = null,
+            smb_delivery_ratio_min = null,
+            smb_delivery_ratio_max = null,
+            smb_delivery_ratio_bg_range = null,
+            smb_max_range_extension = null,
+            enableSMB_EvenOn_OddOff = null,
+            enableSMB_EvenOn_OddOff_always = null,
+            iob_threshold_percent = null,
+            profile_percentage = null
         )
         val meatData = MealData(
             carbs = determineBasalResult.mealData.getInt("carbs"),
@@ -292,7 +324,14 @@ class ReplayApsResultsTest @Inject constructor() {
             delta = determineBasalResult.glucoseStatus.getDouble("delta"),
             short_avgdelta = determineBasalResult.glucoseStatus.getDouble("short_avgdelta"),
             long_avgdelta = determineBasalResult.glucoseStatus.getDouble("long_avgdelta"),
-            date = determineBasalResult.glucoseStatus.getLong("date")
+            date = determineBasalResult.glucoseStatus.getLong("date"),
+            duraISFminutes = null,
+            duraISFaverage = null,
+            bgAcceleration = null,
+            a0 = null,
+            a1 = null,
+            a2 = null,
+            corrSqu = null
         )
         val currenttemp = CurrentTemp(
             duration = determineBasalResult.currentTemp.getInt("duration"),
@@ -363,7 +402,30 @@ class ReplayApsResultsTest @Inject constructor() {
             out_units = determineBasalResult.profile.optString("out_units"),
             variable_sens = determineBasalResult.profile.getDouble("variable_sens"),
             insulinDivisor = determineBasalResult.profile.getInt("insulinDivisor"),
-            TDD = determineBasalResult.profile.getDouble("TDD")
+            TDD = determineBasalResult.profile.getDouble("TDD"),
+            autoISF_version = null,
+            enable_autoISF = null,
+            autoISF_max = null,
+            autoISF_min = null,
+            bgAccel_ISF_weight = null,
+            bgBrake_ISF_weight = null,
+            enable_pp_ISF_always = null,
+            pp_ISF_hours = null,
+            pp_ISF_weight = null,
+            delta_ISFrange_weight = null,
+            lower_ISFrange_weight = null,
+            higher_ISFrange_weight = null,
+            enable_dura_ISF_with_COB = null,
+            dura_ISF_weight = null,
+            smb_delivery_ratio = null,
+            smb_delivery_ratio_min = null,
+            smb_delivery_ratio_max = null,
+            smb_delivery_ratio_bg_range = null,
+            smb_max_range_extension = null,
+            enableSMB_EvenOn_OddOff = null,
+            enableSMB_EvenOn_OddOff_always = null,
+            iob_threshold_percent = null,
+            profile_percentage = null
         )
         val meatData = MealData(
             carbs = determineBasalResult.mealData.getInt("carbs"),
@@ -441,7 +503,14 @@ class ReplayApsResultsTest @Inject constructor() {
             delta = determineBasalResult.glucoseStatus.getDouble("delta"),
             short_avgdelta = determineBasalResult.glucoseStatus.getDouble("short_avgdelta"),
             long_avgdelta = determineBasalResult.glucoseStatus.getDouble("long_avgdelta"),
-            date = 0
+            date = 0,
+            duraISFminutes = null,
+            duraISFaverage = null,
+            bgAcceleration = null,
+            a0 = null,
+            a1 = null,
+            a2 = null,
+            corrSqu = null
         )
         val currenttemp = CurrentTemp(
             duration = determineBasalResult.currentTemp.getInt("duration"),
@@ -511,7 +580,30 @@ class ReplayApsResultsTest @Inject constructor() {
             out_units = determineBasalResult.profile.optString("out_units"),
             variable_sens = 0.0,
             insulinDivisor = 0,
-            TDD = 0.0
+            TDD = 0.0,
+            autoISF_version = null,
+            enable_autoISF = null,
+            autoISF_max = null,
+            autoISF_min = null,
+            bgAccel_ISF_weight = null,
+            bgBrake_ISF_weight = null,
+            enable_pp_ISF_always = null,
+            pp_ISF_hours = null,
+            pp_ISF_weight = null,
+            delta_ISFrange_weight = null,
+            lower_ISFrange_weight = null,
+            higher_ISFrange_weight = null,
+            enable_dura_ISF_with_COB = null,
+            dura_ISF_weight = null,
+            smb_delivery_ratio = null,
+            smb_delivery_ratio_min = null,
+            smb_delivery_ratio_max = null,
+            smb_delivery_ratio_bg_range = null,
+            smb_max_range_extension = null,
+            enableSMB_EvenOn_OddOff = null,
+            enableSMB_EvenOn_OddOff_always = null,
+            iob_threshold_percent = null,
+            profile_percentage = null
         )
         val meatData = MealData(
             carbs = determineBasalResult.mealData.getInt("carbs"),
@@ -590,7 +682,14 @@ class ReplayApsResultsTest @Inject constructor() {
             delta = determineBasalResult.glucoseStatus.getDouble("delta"),
             short_avgdelta = determineBasalResult.glucoseStatus.getDouble("short_avgdelta"),
             long_avgdelta = determineBasalResult.glucoseStatus.getDouble("long_avgdelta"),
-            date = determineBasalResult.glucoseStatus.getLong("date")
+            date = determineBasalResult.glucoseStatus.getLong("date"),
+            duraISFminutes = determineBasalResult.glucoseStatus.getDouble("dura_ISF_minutes"),
+            duraISFaverage = determineBasalResult.glucoseStatus.getDouble("dura_ISF_average"),
+            bgAcceleration = determineBasalResult.glucoseStatus.getDouble("bg_acceleration"),
+            a0 = determineBasalResult.glucoseStatus.getDouble("parabola_fit_a0"),
+            a1 = determineBasalResult.glucoseStatus.getDouble("parabola_fit_a1"),
+            a2 = determineBasalResult.glucoseStatus.getDouble("parabola_fit_a2"),
+            corrSqu = determineBasalResult.glucoseStatus.getDouble("parabola_fit_correlation")
         )
         val currenttemp = CurrentTemp(
             duration = determineBasalResult.currentTemp.getInt("duration"),
@@ -605,7 +704,7 @@ class ReplayApsResultsTest @Inject constructor() {
             Iob(
                 iob = this.getDouble("iob"),
                 basaliob = this.getDouble("basaliob"),
-                bolussnooze = this.getInt("bolussnooze"),
+                bolussnooze = this.getDouble("bolussnooze"),
                 activity = this.getDouble("activity"),
                 lastBolusTime = this.getLong("lastBolusTime"),
                 time = this.getString("time"),
@@ -618,14 +717,14 @@ class ReplayApsResultsTest @Inject constructor() {
         val currentTime = determineBasalResult.currentTime
         val profile = Profile(
             dia = 0,
-            min_5m_carbimpact = 0,
+            min_5m_carbimpact = 0.0,
             max_iob = determineBasalResult.profile.getDouble("max_iob"),
             type = determineBasalResult.profile.getString("type"),
             max_daily_basal = determineBasalResult.profile.getDouble("max_daily_basal"),
             max_basal = determineBasalResult.profile.getDouble("max_basal"),
-            min_bg = determineBasalResult.profile.getInt("min_bg"),
-            max_bg = determineBasalResult.profile.getInt("max_bg"),
-            target_bg = determineBasalResult.profile.getInt("target_bg"),
+            min_bg = determineBasalResult.profile.getDouble("min_bg"),
+            max_bg = determineBasalResult.profile.getDouble("max_bg"),
+            target_bg = determineBasalResult.profile.getDouble("target_bg"),
             carb_ratio = determineBasalResult.profile.getDouble("carb_ratio"),
             sens = determineBasalResult.profile.getDouble("sens"),
             autosens_adjust_targets = false,
@@ -659,9 +758,32 @@ class ReplayApsResultsTest @Inject constructor() {
             autosens_max = determineBasalResult.profile.getDouble("autosens_max"),
             autosens_min = null,
             out_units = determineBasalResult.profile.getString("out_units"),
-            variable_sens = null,
+            variable_sens = 999.9,  // later determineBasalResult.profile.getDouble("variable_sens"),
             insulinDivisor = null,
-            TDD = null
+            TDD = null,
+            autoISF_version = determineBasalResult.profile.getString("autoISF_version"), // AutoISF only ... from here and downwards
+            enable_autoISF = determineBasalResult.profile.getBoolean("enable_autoISF"),
+            autoISF_max = determineBasalResult.profile.getDouble("autoISF_max"),
+            autoISF_min = determineBasalResult.profile.getDouble("autoISF_max"),
+            bgAccel_ISF_weight = determineBasalResult.profile.getDouble("bgAccel_ISF_weight"),
+            bgBrake_ISF_weight = determineBasalResult.profile.getDouble("bgBrake_ISF_weight"),
+            enable_pp_ISF_always = determineBasalResult.profile.getBoolean("enable_pp_ISF_always"),
+            pp_ISF_hours = determineBasalResult.profile.getInt("pp_ISF_hours"),
+            pp_ISF_weight = determineBasalResult.profile.getDouble("pp_ISF_weight"),
+            delta_ISFrange_weight = determineBasalResult.profile.getDouble("delta_ISFrange_weight"),
+            lower_ISFrange_weight = determineBasalResult.profile.getDouble("lower_ISFrange_weight"),
+            higher_ISFrange_weight = determineBasalResult.profile.getDouble("higher_ISFrange_weight"),
+            enable_dura_ISF_with_COB = determineBasalResult.profile.getBoolean("enable_dura_ISF_with_COB"),
+            dura_ISF_weight = determineBasalResult.profile.getDouble("dura_ISF_weight"),
+            smb_delivery_ratio = determineBasalResult.profile.getDouble("smb_delivery_ratio"),
+            smb_delivery_ratio_min = determineBasalResult.profile.getDouble("smb_delivery_ratio_min"),
+            smb_delivery_ratio_max = determineBasalResult.profile.getDouble("smb_delivery_ratio_max"),
+            smb_delivery_ratio_bg_range = determineBasalResult.profile.getDouble("smb_delivery_ratio_bg_range"),
+            smb_max_range_extension = determineBasalResult.profile.getDouble("smb_max_range_extension"),
+            enableSMB_EvenOn_OddOff = determineBasalResult.profile.getBoolean("enableSMB_EvenOn_OddOff"),
+            enableSMB_EvenOn_OddOff_always = determineBasalResult.profile.getBoolean("enableSMB_EvenOn_OddOff_always"),
+            iob_threshold_percent = determineBasalResult.profile.getInt("iob_threshold_percent"),
+            profile_percentage = determineBasalResult.profile.getInt("profile_percentage") // end of AutoISF only
         )
         val meatData = MealData(
             carbs = determineBasalResult.mealData.getInt("carbs"),
@@ -700,6 +822,8 @@ class ReplayApsResultsTest @Inject constructor() {
         assertThat(resultKt.rate ?: Double.NaN).isEqualTo(result?.json?.optDouble("rate"))
         assertThat(resultKt.COB ?: Double.NaN).isEqualTo(result?.json?.optDouble("COB"))
         assertThat(resultKt.IOB ?: Double.NaN).isEqualTo(result?.json?.optDouble("IOB"))
+        //assertThat(resultKt.variable_sens ?: Double.NaN).isEqualTo(result?.json?.optDouble("variable_sens"))
+        assertThat(resultKt.variable_sens ?: Double.NaN).isEqualTo(999.9)   // enforce fault
     }
 
 
