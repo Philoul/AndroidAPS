@@ -719,10 +719,9 @@ class ReplayApsResultsTest @Inject constructor() {
         aapsLogger.debug(LTag.APS,result?.json?.getString("reason") ?: "")
         aapsLogger.debug(LTag.APS,resultKt.reason.toString())
         aapsLogger.debug(LTag.APS,"File: $filename")
-//        assertThat(resultKt.reason.toString()).isEqualTo(result?.json?.getString("reason"))
+        assertThat(resultKt.reason.toString()).isEqualTo(result?.json?.getString("reason"))
         assertThat(resultKt.tick).isEqualTo(result?.json?.optString("tick"))
-        assertThat(resultKt.eventualBG ?: 0).isEqualTo(result?.json?.optInt("eventualBG"))
-        assertThat(resultKt.targetBG ?: 0).isEqualTo(result?.json?.optInt("targetBG"))
+        assertThat(resultKt.targetBG ?: Double.NaN).isEqualTo(result?.json?.optDouble("targetBG"))
         assertThat(resultKt.insulinReq ?: Double.NaN).isEqualTo(result?.json?.optDouble("insulinReq"))
         assertThat(resultKt.carbsReq ?: 0).isEqualTo(result?.json?.optInt("carbsReq"))
         assertThat(resultKt.carbsReqWithin ?: 0).isEqualTo(result?.json?.optInt("carbsReqWithin"))
@@ -732,7 +731,7 @@ class ReplayApsResultsTest @Inject constructor() {
         assertThat(resultKt.rate ?: Double.NaN).isEqualTo(result?.json?.optDouble("rate"))
         assertThat(resultKt.COB ?: Double.NaN).isEqualTo(result?.json?.optDouble("COB"))
         assertThat(resultKt.IOB ?: Double.NaN).isEqualTo(result?.json?.optDouble("IOB"))
-        //assertThat(resultKt.variable_sens ?: Double.NaN).isEqualTo(result?.json?.optDouble("variable_sens"))
+        assertThat(resultKt.variable_sens ?: Double.NaN).isEqualTo(result?.json?.optDouble("variable_sens"))
         assertThat(resultKt.variable_sens ?: Double.NaN).isEqualTo(999.9)   // enforce fault
     }
 
