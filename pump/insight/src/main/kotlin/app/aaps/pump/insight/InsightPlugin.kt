@@ -586,7 +586,7 @@ class InsightPlugin @Inject constructor(
                     aapsLogger.error("Exception while delivering bolus", e)
                     result.comment(ExceptionTranslator.getString(context, e))
                 }
-                result.bolusDelivered(insulin)
+                result.bolusDelivered(insulin * concentration)
             }
         }
         return result
