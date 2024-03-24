@@ -12,6 +12,7 @@ import app.aaps.core.data.model.GlucoseUnit
 import app.aaps.core.data.ue.Action
 import app.aaps.core.data.ue.Sources
 import app.aaps.core.data.ue.ValueWithUnit
+import app.aaps.core.interfaces.aps.Loop
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
 import app.aaps.core.interfaces.logging.UserEntryLogger
@@ -60,6 +61,7 @@ class ProfileFragment : DaggerFragment() {
     @Inject lateinit var uel: UserEntryLogger
     @Inject lateinit var uiInteraction: UiInteraction
     @Inject lateinit var decimalFormatter: DecimalFormatter
+    @Inject lateinit var loop: Loop
 
     private var disposable: CompositeDisposable = CompositeDisposable()
     private var inMenu = false
@@ -70,10 +72,10 @@ class ProfileFragment : DaggerFragment() {
         doEdit()
         basalView?.updateLabel(rh.gs(app.aaps.core.ui.R.string.basal_label) + ": " + sumLabel())
         profilePlugin.getEditedProfile()?.let {
-            binding.basalGraph.show(ProfileSealed.Pure(it))
-            binding.icGraph.show(ProfileSealed.Pure(it))
-            binding.isfGraph.show(ProfileSealed.Pure(it))
-            binding.targetGraph.show(ProfileSealed.Pure(it))
+            binding.basalGraph.show(ProfileSealed.Pure(it, null))
+            binding.icGraph.show(ProfileSealed.Pure(it, null))
+            binding.isfGraph.show(ProfileSealed.Pure(it, null))
+            binding.targetGraph.show(ProfileSealed.Pure(it, null))
             binding.insulinGraph.show(activePlugin.activeInsulin, SafeParse.stringToDouble(binding.dia.text))
         }
     }
@@ -90,7 +92,7 @@ class ProfileFragment : DaggerFragment() {
 
     private fun sumLabel(): String {
         val profile = profilePlugin.getEditedProfile()
-        val sum = profile?.let { ProfileSealed.Pure(profile).baseBasalSum() } ?: 0.0
+        val sum = profile?.let { ProfileSealed.Pure(profile, null).baseBasalSum() } ?: 0.0
         return " ∑" + decimalFormatter.to2Decimal(sum) + rh.gs(app.aaps.core.ui.R.string.insulin_unit_shortname)
     }
 
@@ -125,6 +127,9 @@ class ProfileFragment : DaggerFragment() {
         val activeProfile = profileFunction.getProfileName()
         val profileIndex = profiles.indexOf(activeProfile)
         profilePlugin.currentProfileIndex = if (profileIndex >= 0) profileIndex else 0
+        val aps = activePlugin.activeAPS
+        binding.isfDynamicLabel.visibility = aps.supportsDynamicIsf().toVisibility()
+        binding.icDynamicLabel.visibility = aps.supportsDynamicIc().toVisibility()
     }
 
     fun build() {
@@ -201,8 +206,8 @@ class ProfileFragment : DaggerFragment() {
                 rh.gs(app.aaps.core.ui.R.string.target_long_label),
                 currentProfile.targetLow,
                 currentProfile.targetHigh,
-                HardLimits.VERY_HARD_LIMIT_MIN_BG,
-                HardLimits.VERY_HARD_LIMIT_TARGET_BG,
+                HardLimits.LIMIT_MIN_BG,
+                HardLimits.LIMIT_TARGET_BG,
                 1.0,
                 DecimalFormat("0"),
                 save
@@ -218,12 +223,12 @@ class ProfileFragment : DaggerFragment() {
                     ("0.0"), save
             )
             val range1 = doubleArrayOf(
-                roundUp(profileUtil.fromMgdlToUnits(HardLimits.VERY_HARD_LIMIT_MIN_BG[0], GlucoseUnit.MMOL)),
-                roundDown(profileUtil.fromMgdlToUnits(HardLimits.VERY_HARD_LIMIT_MIN_BG[1], GlucoseUnit.MMOL))
+                roundUp(profileUtil.fromMgdlToUnits(HardLimits.LIMIT_MIN_BG[0], GlucoseUnit.MMOL)),
+                roundDown(profileUtil.fromMgdlToUnits(HardLimits.LIMIT_MIN_BG[1], GlucoseUnit.MMOL))
             )
             val range2 = doubleArrayOf(
-                roundUp(profileUtil.fromMgdlToUnits(HardLimits.VERY_HARD_LIMIT_MAX_BG[0], GlucoseUnit.MMOL)),
-                roundDown(profileUtil.fromMgdlToUnits(HardLimits.VERY_HARD_LIMIT_MAX_BG[1], GlucoseUnit.MMOL))
+                roundUp(profileUtil.fromMgdlToUnits(HardLimits.LIMIT_MAX_BG[0], GlucoseUnit.MMOL)),
+                roundDown(profileUtil.fromMgdlToUnits(HardLimits.LIMIT_MAX_BG[1], GlucoseUnit.MMOL))
             )
             aapsLogger.info(LTag.CORE, "TimeListEdit", "build: range1" + range1[0] + " " + range1[1] + " range2" + range2[0] + " " + range2[1])
             TimeListEdit(
@@ -267,10 +272,10 @@ class ProfileFragment : DaggerFragment() {
             }
         }
         profilePlugin.getEditedProfile()?.let {
-            binding.basalGraph.show(ProfileSealed.Pure(it))
-            binding.icGraph.show(ProfileSealed.Pure(it))
-            binding.isfGraph.show(ProfileSealed.Pure(it))
-            binding.targetGraph.show(ProfileSealed.Pure(it))
+            binding.basalGraph.show(ProfileSealed.Pure(it, null))
+            binding.icGraph.show(ProfileSealed.Pure(it, null))
+            binding.isfGraph.show(ProfileSealed.Pure(it, null))
+            binding.targetGraph.show(ProfileSealed.Pure(it, null))
             binding.insulinGraph.show(activePlugin.activeInsulin, SafeParse.stringToDouble(binding.dia.text))
         }
 
@@ -317,7 +322,11 @@ class ProfileFragment : DaggerFragment() {
         binding.units.text = rh.gs(R.string.units_colon) + " " + (if (currentProfile.mgdl) rh.gs(app.aaps.core.ui.R.string.mgdl) else rh.gs(app.aaps.core.ui.R.string.mmol))
 
         binding.profileswitch.setOnClickListener {
-            uiInteraction.runProfileSwitchDialog(childFragmentManager, profilePlugin.currentProfile()?.name)
+            if (loop.isDisconnected) {
+                activity?.let { activity -> OKDialog.show(activity, rh.gs(R.string.not_available_full), rh.gs(R.string.smscommunicator_pump_disconnected)) }
+            } else {
+                uiInteraction.runProfileSwitchDialog(childFragmentManager, profilePlugin.currentProfile()?.name)
+            }
         }
 
         binding.reset.setOnClickListener {

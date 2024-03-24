@@ -20,6 +20,7 @@ import app.aaps.core.interfaces.rx.events.EventNewNotification
 import app.aaps.core.interfaces.sharedPreferences.SP
 import app.aaps.core.interfaces.smsCommunicator.SmsCommunicator
 import app.aaps.core.interfaces.utils.DateUtil
+import app.aaps.core.keys.BooleanKey
 import app.aaps.core.keys.IntKey
 import app.aaps.core.keys.Preferences
 import app.aaps.core.objects.extensions.asAnnouncement
@@ -60,16 +61,16 @@ class LocalAlertUtilsImpl @Inject constructor(
 
     override fun checkPumpUnreachableAlarm(lastConnection: Long, isStatusOutdated: Boolean, isDisconnected: Boolean) {
         val alarmTimeoutExpired = isAlarmTimeoutExpired(lastConnection, pumpUnreachableThreshold())
-        val nextAlarmOccurrenceReached = sp.getLong("nextPumpDisconnectedAlarm", 0L) < System.currentTimeMillis()
+        val nextAlarmOccurrenceReached = sp.getLong(app.aaps.core.utils.R.string.key_next_pump_disconnected_alarm, 0L) < dateUtil.now()
         if (config.APS && isStatusOutdated && alarmTimeoutExpired && nextAlarmOccurrenceReached && !isDisconnected) {
             if (sp.getBoolean(app.aaps.core.utils.R.string.key_enable_pump_unreachable_alert, true)) {
-                aapsLogger.debug(LTag.CORE, "Generating pump unreachable alarm. lastConnection: " + dateUtil.dateAndTimeString(lastConnection) + " isStatusOutdated: " + isStatusOutdated)
-                sp.putLong("nextPumpDisconnectedAlarm", System.currentTimeMillis() + pumpUnreachableThreshold())
+                aapsLogger.debug(LTag.CORE, "Generating pump unreachable alarm. lastConnection: " + dateUtil.dateAndTimeString(lastConnection) + " isStatusOutdated: true")
+                sp.putLong(app.aaps.core.utils.R.string.key_next_pump_disconnected_alarm, dateUtil.now() + pumpUnreachableThreshold())
                 rxBus.send(EventNewNotification(Notification(Notification.PUMP_UNREACHABLE, rh.gs(R.string.pump_unreachable), Notification.URGENT).also {
                     it.soundId =
                         R.raw.alarm
                 }))
-                if (sp.getBoolean(app.aaps.core.utils.R.string.key_ns_create_announcements_from_errors, true))
+                if (preferences.get(BooleanKey.NsClientCreateAnnouncementsFromErrors))
                     disposable += persistenceLayer.insertPumpTherapyEventIfNewByTimestamp(
                         therapyEvent = TE.asAnnouncement(rh.gs(R.string.pump_unreachable)),
                         timestamp = dateUtil.now(),
@@ -79,7 +80,7 @@ class LocalAlertUtilsImpl @Inject constructor(
                         listValues = listOf(ValueWithUnit.TEType(TE.Type.ANNOUNCEMENT))
                     ).subscribe()
             }
-            if (sp.getBoolean(app.aaps.core.utils.R.string.key_smscommunicator_report_pump_unreachable, true))
+            if (preferences.get(BooleanKey.SmsReportPumpUnreachable))
                 smsCommunicator.sendNotificationToAllNumbers(rh.gs(R.string.pump_unreachable))
         }
         if (!isStatusOutdated && !alarmTimeoutExpired) rxBus.send(EventDismissNotification(Notification.PUMP_UNREACHABLE))
@@ -89,7 +90,7 @@ class LocalAlertUtilsImpl @Inject constructor(
         return if (activePlugin.activePump.pumpDescription.hasCustomUnreachableAlertCheck) {
             activePlugin.activePump.isUnreachableAlertTimeoutExceeded(unreachableThreshold)
         } else {
-            lastConnection + pumpUnreachableThreshold() < System.currentTimeMillis()
+            lastConnection + pumpUnreachableThreshold() < dateUtil.now()
         }
     }
 
@@ -97,31 +98,31 @@ class LocalAlertUtilsImpl @Inject constructor(
      * Call only at startup!
      */
     override fun preSnoozeAlarms() {
-        if (sp.getLong("nextMissedReadingsAlarm", 0L) < System.currentTimeMillis()) {
-            sp.putLong("nextMissedReadingsAlarm", System.currentTimeMillis() + 5 * 60 * 1000)
+        if (sp.getLong(app.aaps.core.utils.R.string.key_next_missed_reading_alarm, 0L) < dateUtil.now()) {
+            sp.putLong(app.aaps.core.utils.R.string.key_next_missed_reading_alarm, dateUtil.now() + 5 * 60 * 1000)
         }
-        if (sp.getLong("nextPumpDisconnectedAlarm", 0L) < System.currentTimeMillis()) {
-            sp.putLong("nextPumpDisconnectedAlarm", System.currentTimeMillis() + 5 * 60 * 1000)
+        if (sp.getLong(app.aaps.core.utils.R.string.key_next_pump_disconnected_alarm, 0L) < dateUtil.now()) {
+            sp.putLong(app.aaps.core.utils.R.string.key_next_pump_disconnected_alarm, dateUtil.now() + 5 * 60 * 1000)
         }
     }
 
     override fun shortenSnoozeInterval() { //shortens alarm times in case of setting changes or future data
-        var nextMissedReadingsAlarm = sp.getLong("nextMissedReadingsAlarm", 0L)
-        nextMissedReadingsAlarm = min(System.currentTimeMillis() + missedReadingsThreshold(), nextMissedReadingsAlarm)
-        sp.putLong("nextMissedReadingsAlarm", nextMissedReadingsAlarm)
-        var nextPumpDisconnectedAlarm = sp.getLong("nextPumpDisconnectedAlarm", 0L)
-        nextPumpDisconnectedAlarm = min(System.currentTimeMillis() + pumpUnreachableThreshold(), nextPumpDisconnectedAlarm)
-        sp.putLong("nextPumpDisconnectedAlarm", nextPumpDisconnectedAlarm)
+        var nextMissedReadingsAlarm = sp.getLong(app.aaps.core.utils.R.string.key_next_missed_reading_alarm, 0L)
+        nextMissedReadingsAlarm = min(dateUtil.now() + missedReadingsThreshold(), nextMissedReadingsAlarm)
+        sp.putLong(app.aaps.core.utils.R.string.key_next_missed_reading_alarm, nextMissedReadingsAlarm)
+        var nextPumpDisconnectedAlarm = sp.getLong(app.aaps.core.utils.R.string.key_next_pump_disconnected_alarm, 0L)
+        nextPumpDisconnectedAlarm = min(dateUtil.now() + pumpUnreachableThreshold(), nextPumpDisconnectedAlarm)
+        sp.putLong(app.aaps.core.utils.R.string.key_next_pump_disconnected_alarm, nextPumpDisconnectedAlarm)
     }
 
-    override fun notifyPumpStatusRead() { //TODO: persist the actual time the pump is read and simplify the whole logic when to alarm
+    override fun reportPumpStatusRead() {
         val pump = activePlugin.activePump
         val profile = profileFunction.getProfile()
         if (profile != null) {
             val lastConnection = pump.lastDataTime()
             val earliestAlarmTime = lastConnection + pumpUnreachableThreshold()
-            if (sp.getLong("nextPumpDisconnectedAlarm", 0L) < earliestAlarmTime) {
-                sp.putLong("nextPumpDisconnectedAlarm", earliestAlarmTime)
+            if (sp.getLong(app.aaps.core.utils.R.string.key_next_pump_disconnected_alarm, 0L) < earliestAlarmTime) {
+                sp.putLong(app.aaps.core.utils.R.string.key_next_pump_disconnected_alarm, earliestAlarmTime)
             }
         }
     }
@@ -129,14 +130,14 @@ class LocalAlertUtilsImpl @Inject constructor(
     override fun checkStaleBGAlert() {
         val bgReading = persistenceLayer.getLastGlucoseValue() ?: return
         if (sp.getBoolean(app.aaps.core.utils.R.string.key_enable_missed_bg_readings_alert, false)
-            && bgReading.timestamp + missedReadingsThreshold() < System.currentTimeMillis()
-            && sp.getLong("nextMissedReadingsAlarm", 0L) < System.currentTimeMillis()
+            && bgReading.timestamp + missedReadingsThreshold() < dateUtil.now()
+            && sp.getLong(app.aaps.core.utils.R.string.key_next_missed_reading_alarm, 0L) < dateUtil.now()
         ) {
             val n = Notification(Notification.BG_READINGS_MISSED, rh.gs(R.string.missed_bg_readings), Notification.URGENT)
             n.soundId = R.raw.alarm
-            sp.putLong("nextMissedReadingsAlarm", System.currentTimeMillis() + missedReadingsThreshold())
+            sp.putLong(app.aaps.core.utils.R.string.key_next_missed_reading_alarm, dateUtil.now() + missedReadingsThreshold())
             rxBus.send(EventNewNotification(n))
-            if (sp.getBoolean(app.aaps.core.utils.R.string.key_ns_create_announcements_from_errors, true)) {
+            if (preferences.get(BooleanKey.NsClientCreateAnnouncementsFromErrors)) {
                 disposable += persistenceLayer.insertPumpTherapyEventIfNewByTimestamp(
                     therapyEvent = TE.asAnnouncement(n.text),
                     timestamp = dateUtil.now(),

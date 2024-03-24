@@ -1,19 +1,18 @@
 package app.aaps.plugins.main.iob.iobCobCalculator
 
 import androidx.collection.LongSparseArray
-import app.aaps.core.data.aps.AutosensData
-import app.aaps.core.data.aps.AutosensResult
 import app.aaps.core.data.aps.BasalData
 import app.aaps.core.data.configuration.Constants
 import app.aaps.core.data.iob.CobInfo
-import app.aaps.core.data.iob.IobTotal
-import app.aaps.core.data.iob.MealData
 import app.aaps.core.data.model.BS
 import app.aaps.core.data.model.TB
-import app.aaps.core.data.plugin.PluginDescription
 import app.aaps.core.data.plugin.PluginType
 import app.aaps.core.data.time.T
+import app.aaps.core.interfaces.aps.AutosensData
 import app.aaps.core.interfaces.aps.AutosensDataStore
+import app.aaps.core.interfaces.aps.AutosensResult
+import app.aaps.core.interfaces.aps.IobTotal
+import app.aaps.core.interfaces.aps.MealData
 import app.aaps.core.interfaces.db.PersistenceLayer
 import app.aaps.core.interfaces.db.ProcessedTbrEbData
 import app.aaps.core.interfaces.iob.IobCobCalculator
@@ -22,6 +21,7 @@ import app.aaps.core.interfaces.logging.LTag
 import app.aaps.core.interfaces.overview.OverviewData
 import app.aaps.core.interfaces.plugin.ActivePlugin
 import app.aaps.core.interfaces.plugin.PluginBase
+import app.aaps.core.interfaces.plugin.PluginDescription
 import app.aaps.core.interfaces.profile.Profile
 import app.aaps.core.interfaces.profile.ProfileFunction
 import app.aaps.core.interfaces.resources.ResourceHelper
@@ -47,7 +47,6 @@ import app.aaps.core.keys.Preferences
 import app.aaps.core.keys.StringKey
 import app.aaps.core.objects.extensions.combine
 import app.aaps.core.objects.extensions.convertedToAbsolute
-import app.aaps.core.objects.extensions.copy
 import app.aaps.core.objects.extensions.iobCalc
 import app.aaps.core.objects.extensions.plus
 import app.aaps.core.objects.extensions.round
@@ -128,7 +127,7 @@ class IobCobCalculatorPlugin @Inject constructor(
                                event.isChanged(rh.gs(DoubleKey.AbsorptionCutOff.key)) ||
                                event.isChanged(rh.gs(DoubleKey.AutosensMax.key)) ||
                                event.isChanged(rh.gs(DoubleKey.AutosensMin.key)) ||
-                               event.isChanged(rh.gs(app.aaps.core.utils.R.string.key_insulin_oref_peak))
+                               event.isChanged(rh.gs(IntKey.InsulinOrefPeak.key))
                            ) {
                                resetDataAndRunCalculation("onEventPreferenceChange", event)
                            }

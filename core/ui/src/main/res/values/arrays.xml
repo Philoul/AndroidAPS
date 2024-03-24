@@ -1,18 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string-array name="ageArray">
-        <item>@string/child</item>
-        <item>@string/teenage</item>
-        <item>@string/adult</item>
-        <item>@string/resistant_adult</item>
-        <item>@string/pregnant</item>
-    </string-array>
-
-    <string-array name="aps_modeArray">
-        <item>@string/closedloop</item>
-        <item>@string/openloop</item>
-        <item>@string/lowglucosesuspend</item>
-    </string-array>
 
     <string-array name="aps_modeValues" translatable="false">
         <item>closed</item>
@@ -20,16 +7,4 @@
         <item>lgs</item>
     </string-array>
 
-    <string-array name="typeInsulinArray">
-        <item>@string/u40</item>
-        <item>@string/u100</item>
-        <item>@string/u200</item>
-        <item>@string/u500</item>
-    </string-array>
-    <string-array name="typeInsulinValues" translatable="false">
-        <item>U40</item>
-        <item>U100</item>
-        <item>U200</item>
-        <item>U500</item>
-    </string-array>
 </resources>

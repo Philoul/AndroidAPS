@@ -19,11 +19,13 @@ import app.aaps.core.interfaces.sharedPreferences.SP
 import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.core.interfaces.utils.Round
 import app.aaps.core.keys.DoubleKey
+import app.aaps.core.keys.IntKey
 import app.aaps.core.keys.Preferences
 import app.aaps.core.objects.extensions.blockValueBySeconds
 import app.aaps.core.objects.extensions.pureProfileFromJson
 import app.aaps.core.objects.profile.ProfileSealed
 import app.aaps.core.utils.MidnightUtils
+import app.aaps.plugins.aps.R
 import dagger.android.HasAndroidInjector
 import org.json.JSONArray
 import org.json.JSONException
@@ -94,8 +96,8 @@ class ATProfile(profile: Profile, var localInsulin: LocalInsulin, val injector: 
     }
 
     fun updateProfile() {
-        data()?.let { profile = ProfileSealed.Pure(it) }
-        data(true)?.let { circadianProfile = ProfileSealed.Pure(it) }
+        data()?.let { profile = ProfileSealed.Pure(value = it, activePlugin = null) }
+        data(true)?.let { circadianProfile = ProfileSealed.Pure(value = it, activePlugin = null) }
     }
 
     //Export json string with oref0 format used for autotune
@@ -116,7 +118,7 @@ class ATProfile(profile: Profile, var localInsulin: LocalInsulin, val injector: 
                 json.put("useCustomPeakTime", true)
                 json.put("insulinPeakTime", 45)
             } else if (insulinInterface.id === Insulin.InsulinType.OREF_FREE_PEAK) {
-                val peakTime: Int = sp.getInt(rh.gs(app.aaps.core.utils.R.string.key_insulin_oref_peak), 75)
+                val peakTime: Int = preferences.get(IntKey.InsulinOrefPeak)
                 json.put("curve", if (peakTime > 50) "rapid-acting" else "ultra-rapid")
                 json.put("useCustomPeakTime", true)
                 json.put("insulinPeakTime", peakTime)
@@ -180,7 +182,7 @@ class ATProfile(profile: Profile, var localInsulin: LocalInsulin, val injector: 
         val store = JSONObject()
         val tunedProfile = if (circadian) circadianProfile else profile
         if (profileName.isEmpty())
-            profileName = rh.gs(app.aaps.core.ui.R.string.autotune_tunedprofile_name)
+            profileName = rh.gs(R.string.autotune_tunedprofile_name)
         try {
             store.put(profileName, tunedProfile.toPureNsJson(dateUtil))
             json.put("defaultProfile", profileName)

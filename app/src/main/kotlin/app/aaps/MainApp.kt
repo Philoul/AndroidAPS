@@ -23,7 +23,6 @@ import app.aaps.core.interfaces.configuration.ConfigBuilder
 import app.aaps.core.interfaces.db.PersistenceLayer
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
-import app.aaps.core.interfaces.logging.UserEntryLogger
 import app.aaps.core.interfaces.notifications.Notification
 import app.aaps.core.interfaces.plugin.PluginBase
 import app.aaps.core.interfaces.resources.ResourceHelper
@@ -43,7 +42,6 @@ import app.aaps.di.DaggerAppComponent
 import app.aaps.implementation.lifecycle.ProcessLifecycleListener
 import app.aaps.implementation.plugin.PluginStore
 import app.aaps.implementation.receivers.NetworkChangeReceiver
-import app.aaps.plugins.aps.utils.StaticInjector
 import app.aaps.plugins.main.general.overview.notifications.NotificationStore
 import app.aaps.plugins.main.general.themes.ThemeSwitcherPlugin
 import app.aaps.receivers.BTReceiver
@@ -84,8 +82,6 @@ class MainApp : DaggerApplication() {
     @Inject lateinit var compatDBHelper: CompatDBHelper
     @Inject lateinit var persistenceLayer: PersistenceLayer
     @Inject lateinit var dateUtil: DateUtil
-    @Suppress("unused") @Inject lateinit var staticInjector: StaticInjector// better avoid, here fake only to initialize
-    @Inject lateinit var uel: UserEntryLogger
     @Inject lateinit var uiInteraction: UiInteraction
     @Inject lateinit var notificationStore: NotificationStore
     @Inject lateinit var processLifecycleListener: Provider<ProcessLifecycleListener>
@@ -136,7 +132,7 @@ class MainApp : DaggerApplication() {
                     // log version
                     disposable += persistenceLayer.insertVersionChangeIfChanged(config.VERSION_NAME, BuildConfig.VERSION_CODE, gitRemote, commitHash).subscribe()
                     // log app start
-                    if (sp.getBoolean(app.aaps.plugins.sync.R.string.key_ns_log_app_started_event, config.APS))
+                    if (preferences.get(BooleanKey.NsClientLogAppStart))
                         disposable += persistenceLayer.insertPumpTherapyEventIfNewByTimestamp(
                             therapyEvent = TE(
                                 timestamp = dateUtil.now(),
@@ -199,34 +195,9 @@ class MainApp : DaggerApplication() {
         }
     }
 
-    @Suppress("SpellCheckingInspection")
     private fun doMigrations() {
         // set values for different builds
-        if (!sp.contains(R.string.key_ns_alarms)) sp.putBoolean(R.string.key_ns_alarms, config.NSCLIENT)
-        if (!sp.contains(R.string.key_ns_announcements)) sp.putBoolean(R.string.key_ns_announcements, config.NSCLIENT)
         // 3.1.0
-        if (sp.contains("ns_wifionly")) {
-            if (sp.getBoolean("ns_wifionly", false)) {
-                sp.putBoolean(app.aaps.plugins.sync.R.string.key_ns_cellular, false)
-                sp.putBoolean(app.aaps.plugins.sync.R.string.key_ns_wifi, true)
-            } else {
-                sp.putBoolean(app.aaps.plugins.sync.R.string.key_ns_cellular, true)
-                sp.putBoolean(app.aaps.plugins.sync.R.string.key_ns_wifi, false)
-            }
-            sp.remove("ns_wifionly")
-        }
-        if (sp.contains("ns_charginonly")) {
-            if (sp.getBoolean("ns_charginonly", false)) {
-                sp.putBoolean(app.aaps.plugins.sync.R.string.key_ns_battery, false)
-                sp.putBoolean(app.aaps.plugins.sync.R.string.key_ns_charging, true)
-            } else {
-                sp.putBoolean(app.aaps.plugins.sync.R.string.key_ns_battery, true)
-                sp.putBoolean(app.aaps.plugins.sync.R.string.key_ns_charging, true)
-            }
-            sp.remove("ns_charginonly")
-        }
-        if (!sp.contains(app.aaps.plugins.sync.R.string.key_ns_log_app_started_event))
-            sp.putBoolean(app.aaps.plugins.sync.R.string.key_ns_log_app_started_event, config.APS)
         if (preferences.getIfExists(StringKey.MaintenanceEmail) == "logs@androidaps.org")
             preferences.put(StringKey.MaintenanceEmail, "logs@aaps.app")
         // fix values for theme switching
@@ -244,6 +215,16 @@ class MainApp : DaggerApplication() {
         if (preferences.get(UnitDoubleKey.OverviewHighMark) == 0.0) preferences.remove(UnitDoubleKey.OverviewHighMark)
         if (preferences.getIfExists(BooleanKey.GeneralSimpleMode) == null)
             preferences.put(BooleanKey.GeneralSimpleMode, !preferences.get(BooleanKey.GeneralSetupWizardProcessed))
+        // Migrate from OpenAPSSMBDynamicISFPlugin
+        if (sp.getBoolean("ConfigBuilder_APS_OpenAPSSMBDynamicISFPlugin_Enabled", false)) {
+            sp.remove("ConfigBuilder_APS_OpenAPSSMBDynamicISFPlugin_Enabled")
+            sp.remove("ConfigBuilder_APS_OpenAPSSMBDynamicISFPlugin_Visible")
+            sp.putBoolean("ConfigBuilder_APS_OpenAPSSMB_Enabled", true)
+            preferences.put(BooleanKey.ApsUseDynamicSensitivity, true)
+        }
+        // convert Double to IntString
+        if (preferences.getIfExists(IntKey.ApsDynIsfAdjustmentFactor) != null)
+            sp.putString(IntKey.ApsDynIsfAdjustmentFactor.key, preferences.get(IntKey.ApsDynIsfAdjustmentFactor).toString())
     }
 
     override fun applicationInjector(): AndroidInjector<out DaggerApplication> {

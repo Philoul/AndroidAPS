@@ -2,7 +2,6 @@ package app.aaps.plugins.aps.autotune
 
 import app.aaps.core.data.configuration.Constants
 import app.aaps.core.data.iob.Iob
-import app.aaps.core.data.iob.IobTotal
 import app.aaps.core.data.model.BS
 import app.aaps.core.data.model.CA
 import app.aaps.core.data.model.EB
@@ -11,14 +10,16 @@ import app.aaps.core.data.model.IDs
 import app.aaps.core.data.model.TB
 import app.aaps.core.data.model.TE
 import app.aaps.core.data.time.T
+import app.aaps.core.interfaces.aps.IobTotal
 import app.aaps.core.interfaces.db.PersistenceLayer
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
 import app.aaps.core.interfaces.profile.Profile
 import app.aaps.core.interfaces.profile.ProfileFunction
-import app.aaps.core.interfaces.sharedPreferences.SP
 import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.core.interfaces.utils.Round
+import app.aaps.core.keys.BooleanKey
+import app.aaps.core.keys.Preferences
 import app.aaps.core.objects.extensions.convertedToAbsolute
 import app.aaps.core.objects.extensions.durationInMinutes
 import app.aaps.core.objects.extensions.round
@@ -38,7 +39,7 @@ open class AutotuneIob @Inject constructor(
     private val aapsLogger: AAPSLogger,
     private val persistenceLayer: PersistenceLayer,
     private val profileFunction: ProfileFunction,
-    private val sp: SP,
+    private val preferences: Preferences,
     private val dateUtil: DateUtil,
     private val autotuneFS: AutotuneFS
 ) {
@@ -76,17 +77,17 @@ open class AutotuneIob @Inject constructor(
 
     @Synchronized
     private fun sortTempBasal() {
-        tempBasals = ArrayList(tempBasals.toList().sortedWith { o1: TB, o2: TB -> (o2.timestamp - o1.timestamp).toInt() })
+        tempBasals = ArrayList(tempBasals.toList().sortedWith { o1: TB, o2: TB -> if (o2.timestamp > o1.timestamp) 1 else -1 })
     }
 
     @Synchronized
     private fun sortNsTreatments() {
-        nsTreatments = ArrayList(nsTreatments.toList().sortedWith { o1: NsTreatment, o2: NsTreatment -> (o2.date - o1.date).toInt() })
+        nsTreatments = ArrayList(nsTreatments.toList().sortedWith { o1: NsTreatment, o2: NsTreatment -> if (o2.date > o1.date) 1 else -1 })
     }
 
     @Synchronized
     private fun sortBoluses() {
-        boluses = ArrayList(boluses.toList().sortedWith { o1: BS, o2: BS -> (o2.timestamp - o1.timestamp).toInt() })
+        boluses = ArrayList(boluses.toList().sortedWith { o1: BS, o2: BS -> if (o2.timestamp > o1.timestamp) 1 else -1 })
     }
 
     private fun initializeBgReadings(from: Long, to: Long) {
@@ -255,7 +256,7 @@ open class AutotuneIob @Inject constructor(
 
     private fun getCalculationToTimeTreatments(time: Long, localInsulin: LocalInsulin): IobTotal {
         val total = IobTotal(time)
-        val detailedLog = sp.getBoolean(app.aaps.core.utils.R.string.key_autotune_additional_log, false)
+        val detailedLog = preferences.get(BooleanKey.AutotuneAdditionalLog)
         for (pos in boluses.indices) {
             val t = boluses[pos]
             if (!t.isValid) continue
@@ -275,7 +276,7 @@ open class AutotuneIob @Inject constructor(
 
     private fun convertToBoluses(eb: EB): MutableList<BS> {
         val result: MutableList<BS> = ArrayList()
-        val aboutFiveMinIntervals = ceil(eb.duration / 5.0).toInt()
+        val aboutFiveMinIntervals = eb.duration / T.mins(5).msecs() + 1
         val spacing = eb.duration / aboutFiveMinIntervals.toDouble()
         for (j in 0L until aboutFiveMinIntervals) {
             // find middle of the interval

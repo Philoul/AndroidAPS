@@ -49,7 +49,6 @@
     <string name="alarm_expired">Expirováno</string>
     <string name="alarm_reservoir_empty">Prázdný zásobník</string>
     <string name="alarm_patch_fault">Chyba Patche</string>
-    <string name="alarm_patch_fault2">Chyba Patche 2</string>
     <string name="alarm_base_fault">Chyba základny</string>
     <string name="alarm_battery_out">Vybitá baterie</string>
     <string name="alarm_no_calibration">Žádná kalibrace</string>
@@ -96,7 +95,7 @@
     <string name="press_next_or_cancel">Stiskněte <b>Další</b> pro deaktivaci nebo <b>Zrušit</b> pro návrat na hlavní obrazovku.</string>
     <string name="deactivating_pump">Deaktivace Patche. Počkejte prosím.</string>
     <string name="deactivating_error">Nepodařilo se deaktivovat, stiskněte <b>Zahodit</b> pro zapomenutí Patche.</string>
-    <string name="retract_needle">Zatížení jehly. Odstraňte Patch z těla.</string>
+    <string name="retract_needle">Uvolněte jehlu. Odstraňte Patch z těla.</string>
     <string name="remove_base_discard_patch">Odstraňte základnu a vhodně zlikvidujte použitou kanylu.</string>
     <string name="press_next_or_OK">Stiskněte <b>OK</b> pro návrat na hlavní obrazovku. Stiskněte <b>Další</b> pro zahájení aktivace nového Patche.</string>
     <string name="activation_in_progress">Jejda! Něco se pokazilo, zdá se, že již probíhá aktivace.</string>
@@ -108,7 +107,7 @@
     <string name="sn_input_title">Sériové číslo</string>
     <string name="sn_input_summary">Zadejte sériové číslo základny Patche.</string>
     <string name="sn_input_invalid">Neplatné sériové číslo!</string>
-    <string name="pump_unsupported">Nevyzkoušená pumpa: %1$d! Kontaktujte nás na Discordu nebo Githubu, kde získáte podporu.</string>
+    <string name="pump_unsupported">Nevyzkoušená pumpa: %1$s! Kontaktujte nás na Discordu nebo Githubu, kde získáte podporu.</string>
     <string name="alarm_setting_title">Nastavení alarmů</string>
     <string name="alarm_setting_summary">Vyberte preferované nastavení alarmů.</string>
     <string name="pump_warning_notification_title">Oznámení o varování pumpy</string>

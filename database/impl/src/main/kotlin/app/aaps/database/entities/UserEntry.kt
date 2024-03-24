@@ -99,6 +99,7 @@ data class UserEntry(
         EXPORT_SETTINGS,
         IMPORT_SETTINGS,
         RESET_DATABASES,
+        RESET_APS_RESULTS,
         CLEANUP_DATABASES,
         EXPORT_DATABASES,
         IMPORT_DATABASES,
@@ -171,6 +172,7 @@ data class UserEntry(
         OmnipodEros,
         OmnipodDash,        //No entry currently
         EOPatch2,
+        Equil,
         Medtrum,
         MDI,
         VirtualPump,

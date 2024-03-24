@@ -6,19 +6,24 @@ import app.aaps.core.data.configuration.Constants
 import app.aaps.core.data.iob.InMemoryGlucoseValue
 import app.aaps.core.data.model.BCR
 import app.aaps.core.data.model.BS
+import app.aaps.core.data.model.GV
 import app.aaps.core.data.model.GlucoseUnit
 import app.aaps.core.data.model.HR
+import app.aaps.core.data.model.OE
 import app.aaps.core.data.model.SC
+import app.aaps.core.data.model.SourceSensor
 import app.aaps.core.data.model.TB
 import app.aaps.core.data.model.TDD
 import app.aaps.core.data.model.TT
 import app.aaps.core.data.model.TrendArrow
+import app.aaps.core.data.pump.defs.PumpDescription
 import app.aaps.core.data.time.T
 import app.aaps.core.data.ue.Action
 import app.aaps.core.data.ue.Sources
 import app.aaps.core.data.ue.ValueWithUnit
 import app.aaps.core.interfaces.aps.AutosensDataStore
 import app.aaps.core.interfaces.aps.Loop
+import app.aaps.core.interfaces.automation.Automation
 import app.aaps.core.interfaces.configuration.Config
 import app.aaps.core.interfaces.constraints.ConstraintsChecker
 import app.aaps.core.interfaces.db.PersistenceLayer
@@ -36,6 +41,7 @@ import app.aaps.core.interfaces.profile.Profile
 import app.aaps.core.interfaces.profile.ProfileFunction
 import app.aaps.core.interfaces.profile.ProfileUtil
 import app.aaps.core.interfaces.pump.DetailedBolusInfo
+import app.aaps.core.interfaces.pump.PumpSync
 import app.aaps.core.interfaces.pump.defs.determineCorrectBolusStepSize
 import app.aaps.core.interfaces.queue.Callback
 import app.aaps.core.interfaces.queue.CommandQueue
@@ -44,6 +50,7 @@ import app.aaps.core.interfaces.resources.ResourceHelper
 import app.aaps.core.interfaces.rx.AapsSchedulers
 import app.aaps.core.interfaces.rx.bus.RxBus
 import app.aaps.core.interfaces.rx.events.EventMobileToWear
+import app.aaps.core.interfaces.rx.events.EventRefreshOverview
 import app.aaps.core.interfaces.rx.events.EventWearUpdateGui
 import app.aaps.core.interfaces.rx.weardata.CwfMetadataKey
 import app.aaps.core.interfaces.rx.weardata.EventData
@@ -54,6 +61,7 @@ import app.aaps.core.interfaces.utils.DecimalFormatter
 import app.aaps.core.interfaces.utils.HardLimits
 import app.aaps.core.interfaces.utils.TrendCalculator
 import app.aaps.core.interfaces.utils.fabric.FabricPrivacy
+import app.aaps.core.keys.BooleanKey
 import app.aaps.core.keys.DoubleKey
 import app.aaps.core.keys.IntKey
 import app.aaps.core.keys.Preferences
@@ -74,6 +82,7 @@ import io.reactivex.rxjava3.disposables.CompositeDisposable
 import io.reactivex.rxjava3.kotlin.plusAssign
 import java.text.DateFormat
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.LinkedList
 import java.util.Locale
@@ -116,9 +125,11 @@ class DataHandlerMobile @Inject constructor(
     private val decimalFormatter: DecimalFormatter
 ) {
 
+    @Inject lateinit var automation: Automation
     private val disposable = CompositeDisposable()
 
     private var lastBolusWizard: BolusWizard? = null
+    private var lastQuickWizardEntry: QuickWizardEntry? = null
 
     init {
         // From Wear
@@ -295,12 +306,42 @@ class DataHandlerMobile @Inject constructor(
             .observeOn(aapsSchedulers.io)
             .subscribe({
                            aapsLogger.debug(LTag.WEAR, "ActionWizardConfirmed received $it from ${it.sourceNodeId}")
+
+                           var carbTime: Long? = null
+                           var carbTimeOffset: Long = 0
+                           var useAlarm = false
+                           val currentTime = Calendar.getInstance().timeInMillis
+                           var eventTime = currentTime
+                           var carbs2 = 0
+                           var duration = 0
+                           var notes: String? = null
+
                            lastBolusWizard?.let { lastBolusWizard ->
                                if (lastBolusWizard.timeStamp == it.timeStamp) { //use last calculation as confirmed string matches
-                                   doBolus(lastBolusWizard.calculatedTotalInsulin, lastBolusWizard.carbs, null, 0, lastBolusWizard.createBolusCalculatorResult())
+                                   lastQuickWizardEntry?.let { lastQuickWizardEntry ->
+                                       carbTimeOffset = lastQuickWizardEntry.carbTime().toLong()
+                                       carbTime = currentTime + (carbTimeOffset * 60000)
+                                       useAlarm = lastQuickWizardEntry.useAlarm() == QuickWizardEntry.YES
+                                       notes = lastQuickWizardEntry.buttonText()
+
+                                       if (lastQuickWizardEntry.useEcarbs() == QuickWizardEntry.YES) {
+
+                                           val timeOffset = lastQuickWizardEntry.time()
+                                           eventTime += (timeOffset * 60000)
+                                           carbs2 = lastQuickWizardEntry.carbs2()
+                                           duration = lastQuickWizardEntry.duration()
+                                       }
+                                   }
+                                   doBolus(lastBolusWizard.calculatedTotalInsulin, lastBolusWizard.carbs, carbTime, 0, lastBolusWizard.createBolusCalculatorResult(), notes)
+                                   doECarbs(carbs2, eventTime, duration, notes)
+
+                                   if (useAlarm && lastBolusWizard.carbs > 0 && carbTimeOffset > 0) {
+                                       automation.scheduleTimeToEatReminder(T.mins(carbTimeOffset).secs().toInt())
+                                   }
                                }
                            }
                            lastBolusWizard = null
+                           lastQuickWizardEntry = null
                        }, fabricPrivacy::logException)
         disposable += rxBus
             .toObservable(EventData.SnoozeAlert::class.java)
@@ -421,13 +462,13 @@ class DataHandlerMobile @Inject constructor(
             bg = bgReading.valueToUnits(profileFunction.getUnits()),
             correction = 0.0,
             percentageCorrection = percentage,
-            useBg = sp.getBoolean(app.aaps.core.utils.R.string.key_wearwizard_bg, true),
-            useCob = sp.getBoolean(app.aaps.core.utils.R.string.key_wearwizard_cob, true),
-            includeBolusIOB = sp.getBoolean(app.aaps.core.utils.R.string.key_wearwizard_iob, true),
-            includeBasalIOB = sp.getBoolean(app.aaps.core.utils.R.string.key_wearwizard_iob, true),
+            useBg = preferences.get(BooleanKey.WearWizardBg),
+            useCob = preferences.get(BooleanKey.WearWizardCob),
+            includeBolusIOB = preferences.get(BooleanKey.WearWizardIob),
+            includeBasalIOB = preferences.get(BooleanKey.WearWizardIob),
             useSuperBolus = false,
-            useTT = sp.getBoolean(app.aaps.core.utils.R.string.key_wearwizard_tt, false),
-            useTrend = sp.getBoolean(app.aaps.core.utils.R.string.key_wearwizard_trend, false),
+            useTT = preferences.get(BooleanKey.WearWizardTt),
+            useTrend = preferences.get(BooleanKey.WearWizardTrend),
             useAlarm = false
         )
         val insulinAfterConstraints = bolusWizard.insulinAfterConstraints
@@ -495,10 +536,30 @@ class DataHandlerMobile @Inject constructor(
             return
         }
 
+        var eCarbsMessagePart = ""
+        if (quickWizardEntry.useEcarbs() == QuickWizardEntry.YES) {
+            val carbs2 = quickWizardEntry.carbs2()
+            val offset = quickWizardEntry.time()
+            val durration = quickWizardEntry.duration()
+
+            eCarbsMessagePart += "\n+" + carbs2.toString() + rh.gs(R.string.grams_short) + "/" + durration.toString() + rh.gs(R.string.hour_short) + "(+" + offset.toString() +
+                rh.gs(app.aaps.core.interfaces.R.string.shortminute) + ")"
+        }
+
+        var carbDelayMessagePart = ""
+        if (quickWizardEntry.carbTime() > 0) {
+            carbDelayMessagePart = "(+" + quickWizardEntry.carbTime().toString() + rh.gs(app.aaps.core.interfaces.R.string.shortminute) + ")"
+            if (quickWizardEntry.useAlarm() == QuickWizardEntry.YES) {
+                carbDelayMessagePart += "!"
+            }
+        }
+
         val message = rh.gs(R.string.quick_wizard_message, quickWizardEntry.buttonText(), wizard.calculatedTotalInsulin, quickWizardEntry.carbs()) +
-            "\n_____________\n" + wizard.explainShort()
+            carbDelayMessagePart +
+            eCarbsMessagePart + "\n_____________\n" + wizard.explainShort()
 
         lastBolusWizard = wizard
+        lastQuickWizardEntry = quickWizardEntry
         rxBus.send(
             EventMobileToWear(
                 EventData.ConfirmAction(
@@ -708,11 +769,11 @@ class DataHandlerMobile @Inject constructor(
                         low *= Constants.MMOLL_TO_MGDL
                         high *= Constants.MMOLL_TO_MGDL
                     }
-                    if (low < HardLimits.VERY_HARD_LIMIT_TEMP_MIN_BG[0] || low > HardLimits.VERY_HARD_LIMIT_TEMP_MIN_BG[1]) {
+                    if (low < HardLimits.LIMIT_TEMP_MIN_BG[0] || low > HardLimits.LIMIT_TEMP_MIN_BG[1]) {
                         sendError(rh.gs(R.string.wear_action_tempt_min_bg_error))
                         return
                     }
-                    if (high < HardLimits.VERY_HARD_LIMIT_TEMP_MAX_BG[0] || high > HardLimits.VERY_HARD_LIMIT_TEMP_MAX_BG[1]) {
+                    if (high < HardLimits.LIMIT_TEMP_MAX_BG[0] || high > HardLimits.LIMIT_TEMP_MAX_BG[1]) {
                         sendError(rh.gs(R.string.wear_action_tempt_max_bg_error))
                         return
                     }
@@ -749,7 +810,7 @@ class DataHandlerMobile @Inject constructor(
             EventMobileToWear(
                 EventData.Preferences(
                     timeStamp = System.currentTimeMillis(),
-                    wearControl = sp.getBoolean(app.aaps.core.utils.R.string.key_wear_control, false),
+                    wearControl = preferences.get(BooleanKey.WearControl),
                     unitsMgdl = profileFunction.getUnits() == GlucoseUnit.MGDL,
                     bolusPercentage = preferences.get(IntKey.OverviewBolusPercentage),
                     maxCarbs = preferences.get(IntKey.SafetyMaxCarbs),
@@ -777,7 +838,7 @@ class DataHandlerMobile @Inject constructor(
         sendTreatments()
         // Status
         // Keep status last. Wear start refreshing after status received
-        sendStatus()
+        sendStatus(from)
     }
 
     private fun sendTreatments() {
@@ -819,29 +880,37 @@ class DataHandlerMobile @Inject constructor(
 
             //temps
             tb2 = processedTbrEbData.getTempBasalIncludingConvertedExtended(runningTime)
-            if (tb1 == null && tb2 == null) {
-                //no temp stays no temp
-            } else if (tb1 != null && tb2 == null) {
-                //temp is over -> push it
-                temps.add(EventData.TreatmentData.TempBasal(tbStart, tbBefore, runningTime, endBasalValue, tbAmount))
-                tb1 = null
-            } else if (tb1 == null && tb2 != null) {
-                //temp begins
-                tb1 = tb2
-                tbStart = runningTime
-                tbBefore = endBasalValue
-                tbAmount = tb1.convertedToAbsolute(runningTime, profileTB)
-            } else if (tb1 != null && tb2 != null) {
-                val currentAmount = tb2.convertedToAbsolute(runningTime, profileTB)
-                if (currentAmount != tbAmount) {
-                    temps.add(EventData.TreatmentData.TempBasal(tbStart, tbBefore, runningTime, currentAmount, tbAmount))
-                    tbStart = runningTime
-                    tbBefore = tbAmount
-                    tbAmount = currentAmount
+            when {
+                tb1 == null && tb2 == null -> {
+                    //no temp stays no temp
+                }
+
+                tb1 != null && tb2 == null -> {
+                    //temp is over -> push it
+                    temps.add(EventData.TreatmentData.TempBasal(tbStart, tbBefore, runningTime, endBasalValue, tbAmount))
+                    tb1 = null
+                }
+
+                tb1 == null && tb2 != null -> {
+                    //temp begins
                     tb1 = tb2
+                    tbStart = runningTime
+                    tbBefore = endBasalValue
+                    tbAmount = tb1.convertedToAbsolute(runningTime, profileTB)
+                }
+
+                tb1 != null && tb2 != null -> {
+                    val currentAmount = tb2.convertedToAbsolute(runningTime, profileTB)
+                    if (currentAmount != tbAmount) {
+                        temps.add(EventData.TreatmentData.TempBasal(tbStart, tbBefore, runningTime, currentAmount, tbAmount))
+                        tbStart = runningTime
+                        tbBefore = tbAmount
+                        tbAmount = currentAmount
+                        tb1 = tb2
+                    }
                 }
             }
-            runningTime += (5 * 60 * 1000).toLong()
+            runningTime += (5 * 60 * 1000L)
         }
         if (beginBasalSegmentTime != runningTime) {
             //push the remaining segment
@@ -880,7 +949,7 @@ class DataHandlerMobile @Inject constructor(
             .forEach { (_, _, _, isValid, _, _, timestamp, _, _, amount) -> boluses.add(EventData.TreatmentData.Treatment(timestamp, 0.0, amount, false, isValid)) }
         val finalLastRun = loop.lastRun
         if (finalLastRun?.request?.hasPredictions == true && finalLastRun.constraintsProcessed != null) {
-            val predArray = finalLastRun.constraintsProcessed!!.predictions
+            val predArray = finalLastRun.constraintsProcessed!!.predictionsAsGv
             if (predArray.isNotEmpty())
                 for (bg in predArray) if (bg.value > 39)
                     predictions.add(
@@ -890,14 +959,25 @@ class DataHandlerMobile @Inject constructor(
                             sgv = bg.value,
                             high = 0.0,
                             low = 0.0,
-                            color = rh.gac(context, app.aaps.core.ui.R.attr.originalBgValueColor)
+                            color = predictionColor(context, bg)
                         )
                     )
         }
         rxBus.send(EventMobileToWear(EventData.TreatmentData(temps, basals, boluses, predictions)))
     }
 
-    private fun sendStatus() {
+    private fun predictionColor(context: Context?, data: GV): Int {
+        return when (data.sourceSensor) {
+            SourceSensor.IOB_PREDICTION   -> rh.gac(context, app.aaps.core.ui.R.attr.iobColor)
+            SourceSensor.COB_PREDICTION   -> rh.gac(context, app.aaps.core.ui.R.attr.cobColor)
+            SourceSensor.A_COB_PREDICTION -> -0x7f000001 and rh.gac(context, app.aaps.core.ui.R.attr.cobColor)
+            SourceSensor.UAM_PREDICTION   -> rh.gac(context, app.aaps.core.ui.R.attr.uamColor)
+            SourceSensor.ZT_PREDICTION    -> rh.gac(context, app.aaps.core.ui.R.attr.ztColor)
+            else                          -> rh.gac(context, app.aaps.core.ui.R.attr.defaultTextColor)
+        }
+    }
+
+    private fun sendStatus(caller: String) {
         val profile = profileFunction.getProfile()
         var status = rh.gs(app.aaps.core.ui.R.string.noprofile)
         var iobSum = ""
@@ -912,13 +992,10 @@ class DataHandlerMobile @Inject constructor(
             iobDetail = "(${decimalFormatter.to2Decimal(bolusIob.iob)}|${decimalFormatter.to2Decimal(basalIob.basaliob)})"
             cobString = iobCobCalculator.getCobInfo("WatcherUpdaterService").generateCOBString(decimalFormatter)
             currentBasal =
-                processedTbrEbData.getTempBasalIncludingConvertedExtended(System.currentTimeMillis())?.toStringShort(decimalFormatter) ?: rh.gs(
-                    app.aaps.core.ui.R.string.pump_base_basal_rate, profile
-                        .getBasal()
-                )
+                processedTbrEbData.getTempBasalIncludingConvertedExtended(System.currentTimeMillis())?.toStringShort(rh) ?: rh.gs(app.aaps.core.ui.R.string.pump_base_basal_rate, profile.getBasal())
 
             //bgi
-            val bgi = -(bolusIob.activity + basalIob.activity) * 5 * profileUtil.fromMgdlToUnits(profile.getIsfMgdl())
+            val bgi = -(bolusIob.activity + basalIob.activity) * 5 * profileUtil.fromMgdlToUnits(profile.getIsfMgdl("DataHandlerMobile $caller"))
             bgiString = "" + (if (bgi >= 0) "+" else "") + decimalFormatter.to1Decimal(bgi)
             status = generateStatusString(profile)
         }
@@ -1067,12 +1144,12 @@ class DataHandlerMobile @Inject constructor(
         return historyList.size < 3 || df.format(Date(historyList[0].timestamp)) != df.format(Date(System.currentTimeMillis() - if (startsYesterday) 1000 * 60 * 60 * 24 else 0))
     }
 
-    private fun getTDDList(returnDummies: MutableList<TDD>): MutableList<TDD> {
+    private fun getTDDList(returnDummies: List<TDD>): MutableList<TDD> {
         var historyList = persistenceLayer.getLastTotalDailyDoses(10, false).toMutableList()
         //var historyList = databaseHelper.getTDDs().toMutableList()
         historyList = historyList.subList(0, min(10, historyList.size))
         // fill single gaps - only needed for Dana*R data
-        val dummies: MutableList<TDD> = returnDummies
+        val dummies: MutableList<TDD> = returnDummies.toMutableList()
         val df: DateFormat = SimpleDateFormat("dd.MM.", Locale.getDefault())
         for (i in 0 until historyList.size - 1) {
             val elem1 = historyList[i]
@@ -1092,7 +1169,7 @@ class DataHandlerMobile @Inject constructor(
     private val TDD.total
         get() = if (totalAmount > 0) totalAmount else basalAmount + bolusAmount
 
-    private fun generateTDDMessage(historyList: MutableList<TDD>, dummies: MutableList<TDD>): String {
+    private fun generateTDDMessage(historyList: MutableList<TDD>, dummies: List<TDD>): String {
         val profile = profileFunction.getProfile() ?: return rh.gs(R.string.no_profile)
         if (historyList.isEmpty()) {
             return rh.gs(R.string.no_history)
@@ -1176,14 +1253,16 @@ class DataHandlerMobile @Inject constructor(
                 .subscribe()
     }
 
-    private fun doBolus(amount: Double, carbs: Int, carbsTime: Long?, carbsDuration: Int, bolusCalculatorResult: BCR?) {
+    private fun doBolus(amount: Double, carbs: Int, carbsTime: Long?, carbsDuration: Int, bolusCalculatorResult: BCR?, notes: String? = null) {
         val detailedBolusInfo = DetailedBolusInfo()
         detailedBolusInfo.insulin = amount
         detailedBolusInfo.carbs = carbs.toDouble()
         detailedBolusInfo.bolusType = BS.Type.NORMAL
         detailedBolusInfo.carbsTimestamp = carbsTime
         detailedBolusInfo.carbsDuration = T.hours(carbsDuration.toLong()).msecs()
+        detailedBolusInfo.notes = notes
         if (detailedBolusInfo.insulin > 0 || detailedBolusInfo.carbs > 0) {
+
             val action = when {
                 amount == 0.0     -> Action.CARBS
                 carbs == 0        -> Action.BOLUS
@@ -1203,6 +1282,35 @@ class DataHandlerMobile @Inject constructor(
                 }
             })
             bolusCalculatorResult?.let { persistenceLayer.insertOrUpdateBolusCalculatorResult(it).blockingGet() }
+
+            if (lastQuickWizardEntry!!.useSuperBolus() == QuickWizardEntry.YES) {
+                val profile = profileFunction.getProfile() ?: return
+                val pump = activePlugin.activePump
+
+                //uel.log(Action.SUPERBOLUS_TBR, Sources.WizardDialog)
+                if (loop.isEnabled()) {
+                    loop.goToZeroTemp(2 * 60, profile, OE.Reason.SUPER_BOLUS, Action.SUPERBOLUS_TBR, Sources.WizardDialog, listOf())
+                    rxBus.send(EventRefreshOverview("WizardDialog"))
+                }
+
+                if (pump.pumpDescription.tempBasalStyle == PumpDescription.ABSOLUTE) {
+                    commandQueue.tempBasalAbsolute(0.0, 120, true, profile, PumpSync.TemporaryBasalType.NORMAL, object : Callback() {
+                        override fun run() {
+                            if (!result.success) {
+                                uiInteraction.runAlarm(result.comment, rh.gs(app.aaps.core.ui.R.string.temp_basal_delivery_error), app.aaps.core.ui.R.raw.boluserror)
+                            }
+                        }
+                    })
+                } else {
+                    commandQueue.tempBasalPercent(0, 120, true, profile, PumpSync.TemporaryBasalType.NORMAL, object : Callback() {
+                        override fun run() {
+                            if (!result.success) {
+                                uiInteraction.runAlarm(result.comment, rh.gs(app.aaps.core.ui.R.string.temp_basal_delivery_error), app.aaps.core.ui.R.raw.boluserror)
+                            }
+                        }
+                    })
+                }
+            }
         }
     }
 
@@ -1223,7 +1331,7 @@ class DataHandlerMobile @Inject constructor(
         })
     }
 
-    private fun doECarbs(carbs: Int, carbsTime: Long, duration: Int) {
+    private fun doECarbs(carbs: Int, carbsTime: Long, duration: Int, notes: String? = null) {
         uel.log(
             action = if (duration == 0) Action.CARBS else Action.EXTENDED_CARBS,
             source = Sources.Wear,
@@ -1231,7 +1339,7 @@ class DataHandlerMobile @Inject constructor(
                                 ValueWithUnit.Gram(carbs),
                                 ValueWithUnit.Hour(duration).takeIf { duration != 0 })
         )
-        doBolus(0.0, carbs, carbsTime, duration, null)
+        doBolus(0.0, carbs, carbsTime, duration, null, notes)
     }
 
     private fun doProfileSwitch(command: EventData.ActionProfileSwitchConfirmed) {

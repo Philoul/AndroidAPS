@@ -77,16 +77,14 @@ class PluginStore @Inject constructor(
         var pluginsInCategory: ArrayList<PluginBase>?
 
         // PluginType.APS
-        if (!config.NSCLIENT && !config.PUMPCONTROL) {
-            pluginsInCategory = getSpecificPluginsList(PluginType.APS)
-            activeAPSStore = getTheOneEnabledInArray(pluginsInCategory, PluginType.APS) as APS?
-            if (activeAPSStore == null) {
-                activeAPSStore = getDefaultPlugin(PluginType.APS) as APS
-                (activeAPSStore as PluginBase).setPluginEnabled(PluginType.APS, true)
-                aapsLogger.debug(LTag.CONFIGBUILDER, "Defaulting APSInterface")
-            }
-            setFragmentVisibilities((activeAPSStore as PluginBase).name, pluginsInCategory, PluginType.APS)
+        pluginsInCategory = getSpecificPluginsList(PluginType.APS)
+        activeAPSStore = getTheOneEnabledInArray(pluginsInCategory, PluginType.APS) as APS?
+        if (activeAPSStore == null) {
+            activeAPSStore = getDefaultPlugin(PluginType.APS) as APS
+            (activeAPSStore as PluginBase).setPluginEnabled(PluginType.APS, true)
+            aapsLogger.debug(LTag.CONFIGBUILDER, "Defaulting APSInterface")
         }
+        setFragmentVisibilities((activeAPSStore as PluginBase).name, pluginsInCategory, PluginType.APS)
 
         // PluginType.INSULIN
         pluginsInCategory = getSpecificPluginsList(PluginType.INSULIN)
@@ -178,13 +176,19 @@ class PluginStore @Inject constructor(
         get() = activeBgSourceStore ?: checkNotNull(activeBgSourceStore) { "No bg source selected" }
 
     override val activeProfileSource: ProfileSource
-        get() = activeProfile ?: checkNotNull(activeProfile) { "No profile selected" }
+        get() = activeProfile ?: wait() ?: activeProfile ?: checkNotNull(activeProfile) { "No profile selected" }
 
     override val activeInsulin: Insulin
         get() = activeInsulinStore ?: getDefaultPlugin(PluginType.INSULIN) as Insulin
 
+    private fun <T> wait(): T? {
+        Thread.sleep(3000)
+        return null
+    }
+
+    // App may not be initialized yet. Wait before second return
     override val activeAPS: APS
-        get() = activeAPSStore ?: checkNotNull(activeAPSStore) { "No APS selected" }
+        get() = activeAPSStore ?: wait() ?: activeAPSStore ?: checkNotNull(activeAPSStore) { "No APS selected" }
 
     override val activePump: Pump
         get() = activePumpStore
