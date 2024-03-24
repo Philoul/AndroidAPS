@@ -8,6 +8,9 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
 import android.os.SystemClock
+import androidx.preference.PreferenceCategory
+import androidx.preference.PreferenceManager
+import androidx.preference.PreferenceScreen
 import app.aaps.core.data.model.BS
 import app.aaps.core.data.model.TE
 import app.aaps.core.data.plugin.PluginType
@@ -124,6 +127,17 @@ class InsightPlugin @Inject constructor(
             "U500" -> 5.0
             else   -> 1.0
         }
+/*
+    val concentration: Double = when (preferences.get(StringKey.InsulinConcentration)) {
+        rh.gs(app.aaps.core.keys.R.string.key_u40)          -> 0.4
+        rh.gs(app.aaps.core.keys.R.string.key_u100)        -> 1.0
+        rh.gs(app.aaps.core.keys.R.string.key_u200)          -> 2.0
+        rh.gs(app.aaps.core.keys.R.string.key_u500)         -> 5.0
+        else                                                  -> 1.0
+    }
+
+ */
+
     private val serviceConnection: ServiceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName, binder: IBinder) {
             if (binder is InsightConnectionService.LocalBinder) {
@@ -1631,6 +1645,45 @@ class InsightPlugin @Inject constructor(
     override fun clearAllTables() {
         insightDatabase.clearAllTables()
     }
+
+    // prepare migration of preferences to kotlin
+    /*
+    override fun addPreferenceScreen(preferenceManager: PreferenceManager, parent: PreferenceScreen, context: Context, requiredKey: String?) {
+        if (requiredKey != null) return
+        val category = PreferenceCategory(context)
+        parent.addPreference(category)
+        category.apply {
+            key = "insight_advanced"
+            title = rh.gs(app.aaps.core.ui.R.string.advanced_settings_title)
+            initialExpandedChildrenCount = 0
+            addPreference(
+                AdaptiveListPreference(
+                    ctx = context,
+                    stringKey = StringKey.InsulinConcentration,
+                    summary = app.aaps.core.ui.R.string.typeinsulin_summary,
+                    title = app.aaps.core.ui.R.string.typeinsulin_title,
+                    entries = insulinEntries(),
+                    entryValues = insulinEntryValues()
+                )
+            )
+        }
+    }
+
+    fun insulinEntries() = arrayOf<CharSequence>(
+        rh.gs(app.aaps.core.ui.R.string.u40),
+        rh.gs(app.aaps.core.ui.R.string.u100),
+        rh.gs(app.aaps.core.ui.R.string.u200),
+        rh.gs(app.aaps.core.ui.R.string.u500),
+    )
+
+    fun insulinEntryValues() = arrayOf<CharSequence>(
+        rh.gs(app.aaps.core.keys.R.string.key_u40),
+        rh.gs(app.aaps.core.keys.R.string.key_u100),
+        rh.gs(app.aaps.core.keys.R.string.key_u200),
+        rh.gs(app.aaps.core.keys.R.string.key_u500),
+    )
+
+    */
 
     companion object {
 

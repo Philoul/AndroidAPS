@@ -7,4 +7,17 @@
         <item>lgs</item>
     </string-array>
 
+    <string-array name="typeInsulinArray">
+        <item>@string/u40</item>
+        <item>@string/u100</item>
+        <item>@string/u200</item>
+        <item>@string/u500</item>
+    </string-array>
+
+    <string-array name="typeInsulinValues" translatable="false">
+        <item>U40</item>
+        <item>U100</item>
+        <item>U200</item>
+        <item>U500</item>
+    </string-array>
 </resources>
