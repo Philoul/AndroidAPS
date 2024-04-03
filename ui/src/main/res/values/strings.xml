@@ -20,7 +20,7 @@
     <!--     Activities-->
     <string name="activity_monitor">Activity monitor</string>
     <string name="do_you_want_reset_stats">Do you want to reset activity stats?</string>
-    <string name="do_you_want_reset_tdd_stats">Do you want to reset TDD stats?</string>
+    <string name="do_you_want_recalculate_tdd_stats">Do you want to recalculate TDD stats?</string>
     <string name="statistics">Statistics</string>
     <string name="calculation_in_progress">Calculation in progress</string>
     <string name="invalid_age">Invalid age entry</string>
@@ -159,13 +159,15 @@
     <string name="overview_quickwizard_item_edit_button">Edit</string>
     <string name="overview_edit_quickwizard_use_positive_iob_only">Positive IOB only</string>
     <string name="overview_edit_quickwizard_superbolus">Superbolus</string>
-    <string name="overview_edit_quickwizard_percentage_to_high">Percentage to high!</string>
+    <string name="overview_edit_quickwizard_percentage_too_high">Percentage too high!</string>
     <string name="overview_editquickwizard_percentage">Percentage</string>
     <string name="a11y_drag_and_drop_handle">drag and drop handle</string>
     <string name="additional_ecarbs">Add eCarbs</string>
     <string name="overview_edit_quickwizard_useforcalculation">Use for calculation:</string>
     <string name="constraints_violation">Constraints violation</string>
     <string name="change_your_input">Change your input!</string>
+    <string name="confirm_treatment">Please confirm treatment</string>
+    <string name="recalculate">Recalculate</string>
 
     <string-array name="yes_no_positiveonly_negativeonly">
         <item>Both</item>
