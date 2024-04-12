@@ -516,6 +516,21 @@
     <string name="initializing">Initializing ...</string>
     <string name="secs" comment="second short">%1$d s</string>
 
+    <!-- Insulin concentration -->
+    <string name="u40">U40</string>
+    <string name="u100">U100</string>
+    <string name="u200">U200</string>
+    <string name="u500">U500</string>
+    <string name="key_typeinsulin" translatable="false">type_insulin</string>
+    <string name="typeinsulin_title">Select Insulin Concentration (default U100)</string>
+    <string name="typeinsulin_summary">CAUTION!\nSelecting a wrong insulin concentration may
+        cause an insulin overdosage.\n- Never change this setting if it\'s not during a
+        reservoir change\n- Always CANCEL Bolus (if not fully injected) or Extended Bolus when
+        you change this setting\n- UPDATE the Prime value for site change (for ex. if you need
+        0.70U to prime cannula with U100 then you should use 1.40U with U200 insulin)</string>
+
+
+
     <!--    Constraints-->
     <string name="limitingbasalratio">Limiting max basal rate to %1$.2f U/h because of %2$s</string>
     <string name="pumplimit">pump limit</string>
