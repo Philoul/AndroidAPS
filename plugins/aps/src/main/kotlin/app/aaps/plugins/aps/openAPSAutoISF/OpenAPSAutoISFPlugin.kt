@@ -142,8 +142,8 @@ open class OpenAPSAutoISFPlugin @Inject constructor(
     val iobThresholdPercent = preferences.get(IntKey.ApsAutoIsfIobThPercent)
     private val exerciseMode = SMBDefaults.exercise_mode
     private val highTemptargetRaisesSensitivity = preferences.get(BooleanKey.ApsAutoIsfHighTtRaisesSens)
-    val profile = profileFunction.getProfile()
-    private val profile_percentage = if (profile is ProfileSealed.EPS) profile.value.originalPercentage else 100
+    //val profile = profileFunction.getProfile()
+    //private val profile_percentage = if (profile is ProfileSealed.EPS) profile.value.originalPercentage else 100
     val normalTarget = 100
 
     override fun supportsDynamicIsf(): Boolean = preferences.get(BooleanKey.ApsUseAutoIsf)
