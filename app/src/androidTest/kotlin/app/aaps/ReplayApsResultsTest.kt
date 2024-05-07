@@ -10,6 +10,7 @@ import app.aaps.core.interfaces.aps.CurrentTemp
 import app.aaps.core.interfaces.aps.GlucoseStatus
 import app.aaps.core.interfaces.aps.MealData
 import app.aaps.core.interfaces.aps.OapsProfile
+import app.aaps.core.interfaces.aps.OapsProfileAutoIsf
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
 import app.aaps.core.interfaces.maintenance.FileListProvider
@@ -600,6 +601,7 @@ class ReplayApsResultsTest @Inject constructor() {
         determineBasalResult.currentTime = input.getLong("currentTime")
         determineBasalResult.flatBGsDetected = input.getBoolean("flatBGsDetected")
         val result = determineBasalResult.invoke()
+        val varSens = result?.variableSens!!
         val endJs = System.currentTimeMillis()
         jsTime += (endJs - startJs)
 
@@ -666,7 +668,7 @@ class ReplayApsResultsTest @Inject constructor() {
         for (i in 0 until determineBasalResult.iobData!!.length())
             iobData.add(determineBasalResult.iobData!!.getJSONObject(i).toIob())
         val currentTime = determineBasalResult.currentTime
-        val profile = OapsProfile(
+        val profile = OapsProfileAutoIsf(
             dia = 0.0,
             min_5m_carbimpact = 0.0,
             max_iob = determineBasalResult.profile.getDouble("max_iob"),
@@ -707,7 +709,7 @@ class ReplayApsResultsTest @Inject constructor() {
             temptargetSet = determineBasalResult.profile.getBoolean("temptargetSet"),
             autosens_max = determineBasalResult.profile.getDouble("autosens_max"),
             out_units = determineBasalResult.profile.optString("out_units"),
-            variable_sens = 116.7, // TODO only available in result.variableSens? , not in determineBasalResult.profile.getDouble("variable_sens"),
+            variable_sens = varSens, // TODO only available in result.variableSens? , not in determineBasalResult.profile.getDouble("variable_sens"),
             insulinDivisor = 0,
             TDD = 0.0,
             autoISF_version = determineBasalResult.profile.optString("autoISF_version"),

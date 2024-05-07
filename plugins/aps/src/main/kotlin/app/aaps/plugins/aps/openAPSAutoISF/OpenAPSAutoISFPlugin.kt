@@ -10,6 +10,7 @@ import androidx.preference.PreferenceManager
 import androidx.preference.PreferenceScreen
 import androidx.preference.SwitchPreference
 import app.aaps.core.data.aps.SMBDefaults
+import app.aaps.core.data.configuration.Constants
 import app.aaps.core.data.model.GlucoseUnit
 import app.aaps.core.data.plugin.PluginType
 import app.aaps.core.data.time.T
@@ -17,7 +18,7 @@ import app.aaps.core.interfaces.aps.APS
 import app.aaps.core.interfaces.aps.APSResult
 import app.aaps.core.interfaces.aps.AutosensResult
 import app.aaps.core.interfaces.aps.CurrentTemp
-import app.aaps.core.interfaces.aps.OapsProfile
+import app.aaps.core.interfaces.aps.OapsProfileAutoIsf
 import app.aaps.core.interfaces.bgQualityCheck.BgQualityCheck
 import app.aaps.core.interfaces.configuration.Config
 import app.aaps.core.interfaces.constraints.Constraint
@@ -39,7 +40,6 @@ import app.aaps.core.interfaces.profiling.Profiler
 import app.aaps.core.interfaces.resources.ResourceHelper
 import app.aaps.core.interfaces.rx.bus.RxBus
 import app.aaps.core.interfaces.rx.events.EventAPSCalculationFinished
-import app.aaps.core.interfaces.ui.UiInteraction
 import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.core.interfaces.utils.HardLimits
 import app.aaps.core.interfaces.utils.Round
@@ -96,7 +96,6 @@ open class OpenAPSAutoISFPlugin @Inject constructor(
     private val persistenceLayer: PersistenceLayer,
     private val glucoseStatusProvider: GlucoseStatusProvider,
     private val bgQualityCheck: BgQualityCheck,
-    private val uiInteraction: UiInteraction,
     private val determineBasalAutoISF: DetermineBasalAutoISF,
     private val profiler: Profiler
 ) : PluginBase(
@@ -108,7 +107,7 @@ open class OpenAPSAutoISFPlugin @Inject constructor(
         .shortName(R.string.autoisf_shortname)
         .preferencesId(PluginDescription.PREFERENCE_SCREEN)
         .preferencesVisibleInSimpleMode(false)
-        .showInList(config.APS)
+        .showInList(config.isEngineeringMode() && config.isDev())
         .description(R.string.description_auto_isf),
     aapsLogger, rh
 ), APS, PluginConstraints {
@@ -293,7 +292,7 @@ open class OpenAPSAutoISFPlugin @Inject constructor(
             consoleError = mutableListOf()
             variableSensitivity = autoISF(now, profile)
         }
-        val oapsProfile = OapsProfile(
+        val oapsProfile = OapsProfileAutoIsf(
             dia = 0.0, // not used
             min_5m_carbimpact = 0.0, // not used
             max_iob = constraintsChecker.getMaxIOBAllowed().also { inputConstraints.copyReasons(it) }.value(),
@@ -364,7 +363,6 @@ open class OpenAPSAutoISFPlugin @Inject constructor(
         //done calculate exercise ratio
         var exerciseRatio = 1.0
         // TODO eliminate
-        var origin_sens = ""
         val target_bg = (minBg + maxBg) / 2
         if (highTemptargetRaisesSensitivity && isTempTarget && target_bg > normalTarget
             || oapsProfile.low_temptarget_lowers_sensitivity && isTempTarget && target_bg < normalTarget
@@ -430,7 +428,7 @@ open class OpenAPSAutoISFPlugin @Inject constructor(
             determineBasalResult.iobData = iobArray
             determineBasalResult.glucoseStatus = glucoseStatus
             determineBasalResult.currentTemp = currentTemp
-            determineBasalResult.oapsProfile = oapsProfile
+            determineBasalResult.oapsProfileAutoIsf = oapsProfile
             determineBasalResult.mealData = mealData
             lastAPSResult = determineBasalResult
             lastAPSRun = now
@@ -518,6 +516,9 @@ open class OpenAPSAutoISFPlugin @Inject constructor(
 
     fun convert_bg(value: Double): String =
         profileUtil.fromMgdlToStringInUnits(value).replace("-0.0", "0.0")
+
+    fun convert_bg_to_units(value: Double, profile: OapsProfileAutoIsf): Double =
+        if (profile.out_units == "mmol/L") value * Constants.MGDL_TO_MMOLL else value
 
     fun autoISF(currentTime: Long, profile: Profile): Double {
         val sens = profile.getProfileIsfMgdl()
@@ -845,18 +846,18 @@ open class OpenAPSAutoISFPlugin @Inject constructor(
         return finalISF
     }
 
-    fun loop_smb(microBolusAllowed: Boolean, profile: OapsProfile, iob_data_iob: Double, useIobTh: Boolean, iobThEffective: Double): String {
+    fun loop_smb(microBolusAllowed: Boolean, profile: OapsProfileAutoIsf, iob_data_iob: Double, useIobTh: Boolean, iobThEffective: Double): String {
         if (!microBolusAllowed) {
             return "AAPS"                                                 // see message in enable_smb
         }
         if (profile.temptargetSet && enableSMB_EvenOn_OddOff || profile.min_bg == profile.max_bg && enableSMB_EvenOn_OddOff_always && !profile.temptargetSet) {
-            val target = convert_bg(profile.target_bg)
+            //TODO: cleaner conversion back to original mmol/L if applicable
+            var target = convert_bg_to_units(profile.target_bg, profile)
             val msgType: String
             val evenTarget: Boolean
             val msgUnits: String
             val msgTail: String
             val msgEven: String
-            val msg: String
             msgType = if (profile.temptargetSet) {
                 "TempTarget"
             } else {
