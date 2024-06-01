@@ -116,6 +116,7 @@ class HistoryBrowseActivity : TranslatedDaggerAppCompatActivity() {
             loadAll("onLongClickZoom")
             true
         }
+        binding.chartMenuButton.visibility = preferences.simpleMode.not().toVisibility()
 
         binding.date.setOnClickListener {
             MaterialDatePicker.Builder.datePicker()
@@ -200,6 +201,10 @@ class HistoryBrowseActivity : TranslatedDaggerAppCompatActivity() {
             .subscribe({ updateCalcProgress(it.finalPercent) }, fabricPrivacy::logException)
         disposable += rxBus
             .toObservable(EventUpdateOverviewGraph::class.java)
+            .observeOn(aapsSchedulers.main)
+            .subscribe({ updateGUI("EventRefreshOverview") }, fabricPrivacy::logException)
+        disposable += rxBus
+            .toObservable(EventRefreshOverview::class.java)
             .observeOn(aapsSchedulers.main)
             .subscribe({ updateGUI("EventRefreshOverview") }, fabricPrivacy::logException)
         disposable += rxBus
