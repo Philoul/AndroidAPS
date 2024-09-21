@@ -153,7 +153,7 @@ open class OpenAPSAutoISFPlugin @Inject constructor(
             val variableSens = it.variableSens ?: return@forEach
             val timestamp = it.date
             val key = timestamp - timestamp % T.mins(30).msecs() + glucose.toLong()
-            if (variableSens > 0) dynIsfCache.put(key, variableSens)
+            if (variableSens > 0) autoIsfCache.put(key, variableSens)
             count++
         }
         aapsLogger.debug(LTag.APS, "Loaded $count variable sensitivity values from database")
@@ -163,14 +163,14 @@ open class OpenAPSAutoISFPlugin @Inject constructor(
 
     override fun getIsfMgdl(multiplier: Double, timeShift: Int, caller: String): Double? {
         val start = dateUtil.now()
-        val sensitivity = calculateVariableIsf(start, bg = null)
+        val sensitivity = calculateVariableIsf(start)
         if (sensitivity.second == null)
             uiInteraction.addNotificationValidTo(
-                Notification.DYN_ISF_FALLBACK, start,
-                rh.gs(R.string.fallback_to_isf_no_tdd), Notification.INFO, dateUtil.now() + T.mins(1).msecs()
+                Notification.AUTO_ISF_FALLBACK, start,
+                rh.gs(R.string.fallback_to_isf), Notification.INFO, dateUtil.now() + T.mins(1).msecs()
             )
         else
-            uiInteraction.dismissNotification(Notification.DYN_ISF_FALLBACK)
+            uiInteraction.dismissNotification(Notification.AUTO_ISF_FALLBACK)
         profiler.log(LTag.APS, String.format("getIsfMgdl() %s %f %s %s", sensitivity.first, sensitivity.second, dateUtil.dateAndTimeAndSecondsString(start), caller), start)
         return sensitivity.second?.let { it * multiplier }
     }
@@ -179,7 +179,7 @@ open class OpenAPSAutoISFPlugin @Inject constructor(
         var count = 0
         var sum = 0.0
         val start = timestamp - T.hours(24).msecs()
-        dynIsfCache.forEach { key, value ->
+        autoIsfCache.forEach { key, value ->
             if (key in start..timestamp) {
                 count++
                 sum += value
@@ -214,23 +214,23 @@ open class OpenAPSAutoISFPlugin @Inject constructor(
         preferenceFragment.findPreference<SwitchPreference>(BooleanKey.ApsUseSmbAfterCarbs.key)?.isVisible = !smbAlwaysEnabled || !advancedFiltering
     }
 
-    private val dynIsfCache = LongSparseArray<Double>()
+    private val autoIsfCache = LongSparseArray<Double>()
 
     @Synchronized
-    private fun calculateVariableIsf(timestamp: Long, bg: Double?): Pair<String, Double?> {
+    private fun calculateVariableIsf(timestamp: Long): Pair<String, Double?> {
         val profile = profileFunction.getProfile(timestamp)
         if (profile == null) return Pair("OFF", null)
-        if (!preferences.get(BooleanKey.ApsUseDynamicSensitivity)) return Pair("OFF", null)
+        if (!supportsDynamicIsf()) return Pair("OFF", null)
         val result = persistenceLayer.getApsResultCloseTo(timestamp)
         if (result?.variableSens != null) {
             aapsLogger.debug("calculateVariableIsf DB  ${dateUtil.dateAndTimeAndSecondsString(timestamp)} ${result.variableSens}")
             return Pair("DB", result.variableSens)
         }
-        val glucose = bg ?: glucoseStatusProvider.glucoseStatusData?.glucose ?: return Pair("GLUC", null)
+        val glucose = glucoseStatusProvider.glucoseStatusData?.glucose ?: return Pair("GLUC", null)
         // Round down to 30 min and use it as a key for caching
         // Add BG to key as it affects calculation
         val key = timestamp - timestamp % T.mins(30).msecs() + glucose.toLong()
-        val cached = dynIsfCache[key]
+        val cached = autoIsfCache[key]
         if (cached != null && timestamp < dateUtil.now()) {
             aapsLogger.debug("calculateVariableIsf HIT ${dateUtil.dateAndTimeAndSecondsString(timestamp)} $cached")
             return Pair("HIT", cached)
@@ -238,8 +238,8 @@ open class OpenAPSAutoISFPlugin @Inject constructor(
         // no cached result found, let's calculate the value
         val autoIsfTimestamp = autoISF(timestamp, profile)
         val sensitivity = autoIsfTimestamp
-        dynIsfCache.put(key, sensitivity)
-        if (dynIsfCache.size() > 1000) dynIsfCache.clear()
+        autoIsfCache.put(key, sensitivity)
+        if (autoIsfCache.size() > 1000) autoIsfCache.clear()
         return Pair("CALC", sensitivity)
     }
 
