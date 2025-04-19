@@ -52,6 +52,7 @@ internal fun RemoteTreatment.toTreatment(): NSTreatment? {
                 pumpType = this.pumpType,
                 pumpSerial = this.pumpSerial,
                 insulin = this.insulin,
+                iCfgJson = this.iCfgJson?.let { JSONObject(it) },
                 type = NSBolus.BolusType.fromString(this.type),
                 isBasalInsulin = isBasalInsulin == true
             )
@@ -221,6 +222,7 @@ internal fun RemoteTreatment.toTreatment(): NSTreatment? {
                 pumpType = this.pumpType,
                 pumpSerial = this.pumpSerial,
                 profileJson = JSONObject(this.profileJson),
+                iCfgJson = JSONObject(this.iCfgJson ?:""),
                 originalProfileName = this.originalProfileName,
                 originalCustomizedName = this.originalCustomizedName,
                 originalTimeshift = this.originalTimeshift,
@@ -253,6 +255,7 @@ internal fun RemoteTreatment.toTreatment(): NSTreatment? {
                 pumpType = this.pumpType,
                 pumpSerial = this.pumpSerial,
                 profileJson = this.profileJson?.let { JSONObject(this.profileJson) },
+                iCfgJson = this.iCfgJson?.let { JSONObject(it) },
                 profile = this.profile,
                 originalProfileName = this.originalProfileName,
                 originalDuration = this.originalDuration,
@@ -402,6 +405,7 @@ internal fun NSTreatment.toRemoteTreatment(): RemoteTreatment? =
             pumpType = pumpType,
             pumpSerial = pumpSerial,
             insulin = insulin,
+            iCfgJson = iCfgJson?.toString(),
             type = type.name,
             isBasalInsulin = isBasalInsulin
         )
@@ -494,6 +498,7 @@ internal fun NSTreatment.toRemoteTreatment(): RemoteTreatment? =
             pumpType = pumpType,
             pumpSerial = pumpSerial,
             profileJson = profileJson.toString(),
+            iCfgJson = iCfgJson.toString(),
             originalProfileName = originalProfileName,
             originalCustomizedName = originalCustomizedName,
             originalTimeshift = originalTimeshift,
@@ -520,6 +525,7 @@ internal fun NSTreatment.toRemoteTreatment(): RemoteTreatment? =
             pumpType = pumpType,
             pumpSerial = pumpSerial,
             profileJson = profileJson.toString(), // must be de-customized
+            iCfgJson = iCfgJson?.toString(),
             profile = profile,
             originalProfileName = originalProfileName,
             originalDuration = originalDuration,

@@ -1,10 +1,13 @@
 package app.aaps.plugins.sync.nsclient.extensions
 
 import app.aaps.core.data.model.EPS
+import app.aaps.core.data.model.ICfg
 import app.aaps.core.data.model.TE
 import app.aaps.core.data.pump.defs.PumpType
 import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.core.objects.extensions.pureProfileFromJson
+import app.aaps.core.objects.extensions.fromJson
+import app.aaps.core.objects.extensions.toJson
 import app.aaps.core.objects.profile.ProfileSealed
 import app.aaps.core.utils.JsonHelper
 import org.json.JSONObject
@@ -16,6 +19,7 @@ fun EPS.toJson(isAdd: Boolean, dateUtil: DateUtil): JSONObject =
         .put("isValid", isValid)
         .put("eventType", TE.Type.NOTE.text) // move to separate collection when available in NS
         .put("profileJson", ProfileSealed.EPS(value = this, activePlugin = null).toPureNsJson(dateUtil).toString())
+        .put("iCfgJson", iCfg.toJson())
         .put("originalProfileName", originalProfileName)
         .put("originalCustomizedName", originalCustomizedName)
         .put("originalTimeshift", originalTimeshift)
@@ -46,6 +50,7 @@ fun EPS.Companion.fromJson(jsonObject: JSONObject, dateUtil: DateUtil): EPS? {
     val originalProfileName = JsonHelper.safeGetStringAllowNull(jsonObject, "originalProfileName", null) ?: return null
     val originalCustomizedName = JsonHelper.safeGetStringAllowNull(jsonObject, "originalCustomizedName", null) ?: return null
     val profileJson = JsonHelper.safeGetStringAllowNull(jsonObject, "profileJson", null) ?: return null
+    val iCfg = ICfg.fromJson(jsonObject.optJSONObject("iCfgJson") ?: JSONObject())
     val pumpId = JsonHelper.safeGetLongAllowNull(jsonObject, "pumpId", null)
     val pumpType = PumpType.fromString(JsonHelper.safeGetStringAllowNull(jsonObject, "pumpType", null))
     val pumpSerial = JsonHelper.safeGetStringAllowNull(jsonObject, "pumpSerial", null)
@@ -67,7 +72,7 @@ fun EPS.Companion.fromJson(jsonObject: JSONObject, dateUtil: DateUtil): EPS? {
         originalPercentage = originalPercentage,
         originalDuration = originalDuration,
         originalEnd = originalEnd,
-        iCfg = profileSealed.iCfg,
+        iCfg = iCfg,
         isValid = isValid
     ).also {
         it.ids.nightscoutId = id

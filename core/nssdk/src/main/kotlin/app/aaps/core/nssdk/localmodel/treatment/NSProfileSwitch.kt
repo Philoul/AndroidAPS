@@ -23,6 +23,7 @@ data class NSProfileSwitch(
     override var app: String? = null,
     val profileJson: JSONObject?,
     val profile: String,
+    val iCfgJson: JSONObject?,
     val originalProfileName: String?,
     val timeShift: Long?,
     val percentage: Int?,

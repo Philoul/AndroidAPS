@@ -1,9 +1,12 @@
 package app.aaps.plugins.sync.nsclient.extensions
 
 import app.aaps.core.data.model.BS
+import app.aaps.core.data.model.ICfg
 import app.aaps.core.data.model.TE
 import app.aaps.core.data.pump.defs.PumpType
 import app.aaps.core.interfaces.utils.DateUtil
+import app.aaps.core.objects.extensions.fromJson
+import app.aaps.core.objects.extensions.toJson
 import app.aaps.core.utils.JsonHelper
 import org.json.JSONObject
 
@@ -14,6 +17,7 @@ fun BS.toJson(isAdd: Boolean, dateUtil: DateUtil): JSONObject =
             if (type == BS.Type.SMB) TE.Type.CORRECTION_BOLUS.text else TE.Type.MEAL_BOLUS.text
         )
         .put("insulin", amount)
+        .put("iCfgJson", iCfg?.toJson() ?: JSONObject())
         .put("created_at", dateUtil.toISOString(timestamp))
         .put("date", timestamp)
         .put("type", type.name)
@@ -34,6 +38,7 @@ fun BS.Companion.fromJson(jsonObject: JSONObject): BS? {
     val amount = JsonHelper.safeGetDoubleAllowNull(jsonObject, "insulin") ?: return null
     val type = BS.Type.fromString(JsonHelper.safeGetString(jsonObject, "type"))
     val isValid = JsonHelper.safeGetBoolean(jsonObject, "isValid", true)
+    val iCfg = ICfg.fromJson(jsonObject.optJSONObject("iCfgJson") ?: JSONObject())
     val notes = JsonHelper.safeGetStringAllowNull(jsonObject, "notes", null)
     val id = JsonHelper.safeGetStringAllowNull(jsonObject, "identifier", null)
         ?: JsonHelper.safeGetStringAllowNull(jsonObject, "_id", null)
@@ -48,6 +53,7 @@ fun BS.Companion.fromJson(jsonObject: JSONObject): BS? {
     return BS(
         timestamp = timestamp,
         amount = amount,
+        iCfg = iCfg,
         type = type,
         notes = notes,
         isValid = isValid,

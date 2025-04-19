@@ -1,5 +1,6 @@
 package app.aaps.plugins.sync.nsclient.extensions
 
+import app.aaps.core.data.model.ICfg
 import app.aaps.core.data.model.PS
 import app.aaps.core.data.model.TE
 import app.aaps.core.data.pump.defs.PumpType
@@ -7,8 +8,10 @@ import app.aaps.core.data.time.T
 import app.aaps.core.interfaces.plugin.ActivePlugin
 import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.core.interfaces.utils.DecimalFormatter
+import app.aaps.core.objects.extensions.fromJson
 import app.aaps.core.objects.extensions.getCustomizedName
 import app.aaps.core.objects.extensions.pureProfileFromJson
+import app.aaps.core.objects.extensions.toJson
 import app.aaps.core.objects.profile.ProfileSealed
 import app.aaps.core.utils.JsonHelper
 import org.json.JSONObject
@@ -19,6 +22,7 @@ fun PS.toJson(isAdd: Boolean, dateUtil: DateUtil, decimalFormatter: DecimalForma
         .put("percentage", percentage)
         .put("duration", T.msecs(duration).mins())
         .put("profile", getCustomizedName(decimalFormatter))
+        .put("iCfgJson", iCfg.toJson())
         .put("originalProfileName", profileName)
         .put("originalDuration", duration)
         .put("created_at", dateUtil.toISOString(timestamp))
@@ -66,6 +70,12 @@ fun PS.Companion.fromJson(jsonObject: JSONObject, dateUtil: DateUtil, activePlug
     val profileName = JsonHelper.safeGetStringAllowNull(jsonObject, "profile", null) ?: return null
     val originalProfileName = JsonHelper.safeGetStringAllowNull(jsonObject, "originalProfileName", null)
     val profileJson = JsonHelper.safeGetStringAllowNull(jsonObject, "profileJson", null)
+    val iCfg = ICfg.fromJson(jsonObject.optJSONObject("iCfgJson")).let {
+        if(activePlugin.activeInsulin.isValid(it))
+            it
+        else
+            activePlugin.activeInsulin.iCfg
+    }
     val pumpId = JsonHelper.safeGetLongAllowNull(jsonObject, "pumpId", null)
     val pumpType = PumpType.fromString(JsonHelper.safeGetStringAllowNull(jsonObject, "pumpType", null))
     val pumpSerial = JsonHelper.safeGetStringAllowNull(jsonObject, "pumpSerial", null)
@@ -90,7 +100,7 @@ fun PS.Companion.fromJson(jsonObject: JSONObject, dateUtil: DateUtil, activePlug
         timeshift = timeshift,
         percentage = percentage,
         duration = originalDuration ?: T.mins(duration).msecs(),
-        iCfg = profileSealed.iCfg,
+        iCfg = iCfg,
         isValid = isValid
     ).also {
         it.ids.nightscoutId = id

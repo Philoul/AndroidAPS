@@ -1,6 +1,7 @@
 package app.aaps.core.nssdk.localmodel.treatment
 
 import app.aaps.core.nssdk.localmodel.entry.NsUnits
+import org.json.JSONObject
 
 data class NSBolus(
     override var date: Long?,
@@ -21,6 +22,7 @@ data class NSBolus(
     override val pumpSerial: String?,
     override var app: String? = null,
     val insulin: Double,
+    val iCfgJson: JSONObject?,
     val type: BolusType,
     val isBasalInsulin: Boolean
 

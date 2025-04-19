@@ -1,5 +1,6 @@
 package app.aaps.plugins.sync.nsclientV3.extensions
 
+import app.aaps.core.data.model.ICfg
 import app.aaps.core.data.model.IDs
 import app.aaps.core.data.model.PS
 import app.aaps.core.data.pump.defs.PumpType
@@ -9,8 +10,10 @@ import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.core.interfaces.utils.DecimalFormatter
 import app.aaps.core.nssdk.localmodel.treatment.EventType
 import app.aaps.core.nssdk.localmodel.treatment.NSProfileSwitch
+import app.aaps.core.objects.extensions.fromJson
 import app.aaps.core.objects.extensions.getCustomizedName
 import app.aaps.core.objects.extensions.pureProfileFromJson
+import app.aaps.core.objects.extensions.toJson
 import app.aaps.core.objects.profile.ProfileSealed
 import java.security.InvalidParameterException
 
@@ -34,7 +37,7 @@ fun NSProfileSwitch.toProfileSwitch(activePlugin: ActivePlugin, dateUtil: DateUt
         timeshift = timeShift ?: 0,
         percentage = percentage ?: 100,
         duration = duration ?: 0L,
-        iCfg = profileSealed.iCfg,
+        iCfg = iCfgJson?.let { ICfg.fromJson(it) } ?:ICfg("", 0, 0.0),
         ids = IDs(nightscoutId = identifier, pumpId = pumpId, pumpType = PumpType.fromString(pumpType), pumpSerial = pumpSerial, endId = endId)
     )
 }
@@ -58,6 +61,7 @@ fun PS.toNSProfileSwitch(dateUtil: DateUtil, decimalFormatter: DecimalFormatter)
         originalProfileName = profileName,
         originalDuration = duration,
         profileJson = ProfileSealed.PS(value = notCustomized, activePlugin = null).toPureNsJson(dateUtil),
+        iCfgJson = iCfg.toJson(),
         identifier = ids.nightscoutId,
         pumpId = ids.pumpId,
         pumpType = ids.pumpType?.name,

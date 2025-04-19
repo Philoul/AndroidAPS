@@ -22,6 +22,7 @@ data class NSEffectiveProfileSwitch(
     override val pumpSerial: String?,
     override var app: String? = null,
     val profileJson: JSONObject,
+    val iCfgJson: JSONObject,
     val originalProfileName: String,
     val originalCustomizedName: String,
     val originalTimeshift: Long,
