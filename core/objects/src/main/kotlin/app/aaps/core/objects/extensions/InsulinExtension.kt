@@ -10,15 +10,15 @@ fun ICfg.toJson(): JSONObject = JSONObject()
     .put("insulinPeakTime", insulinPeakTime)
     .put("insulinTemplate", insulinTemplate)
 
-fun ICfg.getTemplate() = if(insulinTemplate != 0) Insulin.InsulinType.fromInt(insulinTemplate) else Insulin.InsulinType.fromPeak(insulinPeakTime)
+fun ICfg.getTemplate() = if (insulinTemplate != 0) Insulin.InsulinType.fromInt(insulinTemplate) else Insulin.InsulinType.fromPeak(insulinPeakTime)
 
 fun ICfg.setTemplate(template: Insulin.InsulinType) {
     insulinTemplate = template.value
 }
 
-fun ICfg.Companion.fromJson(json: JSONObject): ICfg = ICfg(
-    insulinLabel = json.optString("insulinLabel", ""),
-    insulinEndTime = json.optLong("insulinEndTime", 0),
-    insulinPeakTime = json.optLong("insulinPeakTime", 0),
-    insulinTemplate = json.optInt("insulinTemplate", 0)
+fun ICfg.Companion.fromJson(json: JSONObject?): ICfg = ICfg(
+    insulinLabel = json?.optString("insulinLabel", "") ?: "",
+    insulinEndTime = json?.optLong("insulinEndTime", 0) ?: 0L,
+    insulinPeakTime = json?.optLong("insulinPeakTime", 0) ?: 0L,
+    insulinTemplate = json?.optInt("insulinTemplate", 0) ?: 0
 )

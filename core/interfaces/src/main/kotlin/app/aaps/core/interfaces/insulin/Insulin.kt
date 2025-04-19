@@ -35,7 +35,7 @@ interface Insulin : ConfigExportImport {
     fun getOrCreateInsulin(iCfg: ICfg): ICfg
     fun getInsulin(insulinLabel: String): ICfg
     fun iobCalcForTreatment(bolus: BS, time: Long, iCfg: ICfg): Iob
-    fun isValid(testICfg: ICfg): Boolean
+    fun isValid(testICfg: ICfg?): Boolean
 
     val iCfg: ICfg
 }

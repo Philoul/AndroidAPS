@@ -348,7 +348,9 @@ class InsulinPlugin @Inject constructor(
         return true
     }
 
-    override fun isValid(testICfg: ICfg): Boolean {
+    override fun isValid(testICfg: ICfg?): Boolean {
+        if (testICfg == null)
+            return false
         with(testICfg) {
             if (getDia() < hardLimits.minDia() || getDia() > hardLimits.maxDia())
                 return false
