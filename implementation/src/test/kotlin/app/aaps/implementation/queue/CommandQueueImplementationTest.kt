@@ -9,6 +9,7 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.testing.TestListenableWorkerBuilder
 import app.aaps.core.data.model.BS
+import app.aaps.core.data.model.ICfg
 import app.aaps.core.interfaces.androidPermissions.AndroidPermission
 import app.aaps.core.interfaces.configuration.Config
 import app.aaps.core.interfaces.constraints.ConstraintsChecker
@@ -202,6 +203,7 @@ class CommandQueueImplementationTest : TestBaseWithProfile() {
             BS(
                 timestamp = Calendar.getInstance().also { it.set(2000, 0, 1) }.timeInMillis,
                 type = BS.Type.NORMAL,
+                iCfg = ICfg("", 45, 7.0),
                 amount = 0.0
             )
         )

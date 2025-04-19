@@ -66,7 +66,7 @@ class InsulinPluginTest: TestBaseWithProfile() {
 
     @Test
     fun testIobCalcForTreatment() {
-        val treatment = BS(timestamp = 0, amount = 10.0, type = BS.Type.NORMAL)
+        val treatment = BS(timestamp = 0, amount = 10.0, iCfg = ICfg("", 45, 7.0), type = BS.Type.NORMAL)
         val iCfg = ICfg("Test", 30, Constants.defaultDIA)
         val time = System.currentTimeMillis()
         // check directly after bolus

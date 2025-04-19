@@ -25,7 +25,8 @@ data class BS(
             amount == other.amount &&
             type == other.type &&
             notes == other.notes &&
-            isBasalInsulin == other.isBasalInsulin
+            isBasalInsulin == other.isBasalInsulin &&
+            iCfg?.isEqual(other.iCfg) ?:true
 
     fun onlyNsIdAdded(previous: BS): Boolean =
         previous.id != id &&

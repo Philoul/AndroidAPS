@@ -52,7 +52,7 @@ internal fun RemoteTreatment.toTreatment(): NSTreatment? {
                 pumpType = this.pumpType,
                 pumpSerial = this.pumpSerial,
                 insulin = this.insulin,
-                iCfgJson = this.iCfgJson?.let { JSONObject(it) },
+                iCfgJson = this.iCfgJson?.let { JSONObject(it) } ?: JSONObject(),
                 type = NSBolus.BolusType.fromString(this.type),
                 isBasalInsulin = isBasalInsulin == true
             )

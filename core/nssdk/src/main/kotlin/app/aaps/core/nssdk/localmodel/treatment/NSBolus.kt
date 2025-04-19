@@ -22,7 +22,7 @@ data class NSBolus(
     override val pumpSerial: String?,
     override var app: String? = null,
     val insulin: Double,
-    val iCfgJson: JSONObject?,
+    val iCfgJson: JSONObject,
     val type: BolusType,
     val isBasalInsulin: Boolean
 

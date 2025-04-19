@@ -59,6 +59,7 @@ fun EB.iobCalc(time: Long, profile: Profile, insulinInterface: Insulin): IobTota
                 val tempBolusPart = BS(
                     timestamp = calcDate,
                     amount = tempBolusSize,
+                    iCfg = iCfg,
                     type = BS.Type.NORMAL
                 )
                 val aIOB = insulinInterface.iobCalcForTreatment(tempBolusPart, time, iCfg)
@@ -108,6 +109,7 @@ fun EB.iobCalc(
                 val tempBolusPart = BS(
                     timestamp = calcDate,
                     amount = tempBolusSize,
+                    iCfg = iCfg,
                     type = BS.Type.NORMAL
                 )
                 val aIOB = insulinInterface.iobCalcForTreatment(tempBolusPart, time, iCfg)

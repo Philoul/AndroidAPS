@@ -140,6 +140,7 @@ class PumpSyncImplementation @Inject constructor(
                 )
             },
             bolus = bolus?.let {
+                val iCfg = profileFunction.getProfile(bolus.timestamp)?.iCfg() ?:activePlugin.activeInsulin.iCfg
                 PumpSync.PumpState.Bolus(
                     timestamp = bolus.timestamp,
                     amount = bolus.amount
@@ -152,9 +153,11 @@ class PumpSyncImplementation @Inject constructor(
 
     override fun addBolusWithTempId(timestamp: Long, amount: Double, temporaryId: Long, type: BS.Type, pumpType: PumpType, pumpSerial: String): Boolean {
         if (!confirmActivePump(timestamp, pumpType, pumpSerial)) return false
+        val iCfg = profileFunction.getProfile(timestamp)?.iCfg() ?:activePlugin.activeInsulin.iCfg
         val bolus = BS(
             timestamp = timestamp,
             amount = amount,
+            iCfg = iCfg,
             type = type,
             ids = IDs(
                 temporaryId = temporaryId,
@@ -169,9 +172,11 @@ class PumpSyncImplementation @Inject constructor(
 
     override fun syncBolusWithTempId(timestamp: Long, amount: Double, temporaryId: Long, type: BS.Type?, pumpId: Long?, pumpType: PumpType, pumpSerial: String): Boolean {
         if (!confirmActivePump(timestamp, pumpType, pumpSerial)) return false
+        val iCfg = profileFunction.getProfile(timestamp)?.iCfg() ?:activePlugin.activeInsulin.iCfg
         val bolus = BS(
             timestamp = timestamp,
             amount = amount,
+            iCfg = iCfg,
             type = BS.Type.NORMAL, // not used for update
             ids = IDs(
                 temporaryId = temporaryId,
@@ -187,9 +192,11 @@ class PumpSyncImplementation @Inject constructor(
 
     override fun syncBolusWithPumpId(timestamp: Long, amount: Double, type: BS.Type?, pumpId: Long, pumpType: PumpType, pumpSerial: String): Boolean {
         if (!confirmActivePump(timestamp, pumpType, pumpSerial)) return false
+        val iCfg = profileFunction.getProfile(timestamp)?.iCfg() ?:activePlugin.activeInsulin.iCfg
         val bolus = BS(
             timestamp = timestamp,
             amount = amount,
+            iCfg = iCfg,
             type = type ?: BS.Type.NORMAL,
             ids = IDs(
                 pumpId = pumpId,

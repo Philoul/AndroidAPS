@@ -16,13 +16,13 @@ import app.aaps.core.objects.profile.ProfileSealed
 import app.aaps.core.utils.JsonHelper
 import org.json.JSONObject
 
-fun PS.toJson(isAdd: Boolean, dateUtil: DateUtil, decimalFormatter: DecimalFormatter): JSONObject =
+fun PS.toJson(isAdd: Boolean, dateUtil: DateUtil, decimalFormatter: DecimalFormatter, activePlugin: ActivePlugin): JSONObject =
     JSONObject()
         .put("timeshift", timeshift)
         .put("percentage", percentage)
         .put("duration", T.msecs(duration).mins())
         .put("profile", getCustomizedName(decimalFormatter))
-        .put("iCfgJson", iCfg.toJson())
+        .put("iCfgJson", if (activePlugin.activeInsulin.isValid(iCfg)) iCfg.toJson() else activePlugin.activeInsulin.iCfg.toJson())
         .put("originalProfileName", profileName)
         .put("originalDuration", duration)
         .put("created_at", dateUtil.toISOString(timestamp))

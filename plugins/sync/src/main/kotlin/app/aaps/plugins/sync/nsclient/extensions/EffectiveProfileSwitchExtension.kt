@@ -4,6 +4,7 @@ import app.aaps.core.data.model.EPS
 import app.aaps.core.data.model.ICfg
 import app.aaps.core.data.model.TE
 import app.aaps.core.data.pump.defs.PumpType
+import app.aaps.core.interfaces.plugin.ActivePlugin
 import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.core.objects.extensions.pureProfileFromJson
 import app.aaps.core.objects.extensions.fromJson
@@ -12,14 +13,14 @@ import app.aaps.core.objects.profile.ProfileSealed
 import app.aaps.core.utils.JsonHelper
 import org.json.JSONObject
 
-fun EPS.toJson(isAdd: Boolean, dateUtil: DateUtil): JSONObject =
+fun EPS.toJson(isAdd: Boolean, dateUtil: DateUtil, activePlugin: ActivePlugin): JSONObject =
     JSONObject()
         .put("created_at", dateUtil.toISOString(timestamp))
         .put("enteredBy", "openaps://" + "AndroidAPS")
         .put("isValid", isValid)
         .put("eventType", TE.Type.NOTE.text) // move to separate collection when available in NS
         .put("profileJson", ProfileSealed.EPS(value = this, activePlugin = null).toPureNsJson(dateUtil).toString())
-        .put("iCfgJson", iCfg.toJson())
+        .put("iCfgJson", if (activePlugin.activeInsulin.isValid(iCfg)) iCfg.toJson() else activePlugin.activeInsulin.iCfg.toJson())
         .put("originalProfileName", originalProfileName)
         .put("originalCustomizedName", originalCustomizedName)
         .put("originalTimeshift", originalTimeshift)
@@ -34,7 +35,7 @@ fun EPS.toJson(isAdd: Boolean, dateUtil: DateUtil): JSONObject =
             if (isAdd && ids.nightscoutId != null) it.put("_id", ids.nightscoutId)
         }
 
-fun EPS.Companion.fromJson(jsonObject: JSONObject, dateUtil: DateUtil): EPS? {
+fun EPS.Companion.fromJson(jsonObject: JSONObject, dateUtil: DateUtil, activePlugin: ActivePlugin): EPS? {
     val timestamp =
         JsonHelper.safeGetLongAllowNull(jsonObject, "mills", null)
             ?: JsonHelper.safeGetLongAllowNull(jsonObject, "date", null)
@@ -50,7 +51,12 @@ fun EPS.Companion.fromJson(jsonObject: JSONObject, dateUtil: DateUtil): EPS? {
     val originalProfileName = JsonHelper.safeGetStringAllowNull(jsonObject, "originalProfileName", null) ?: return null
     val originalCustomizedName = JsonHelper.safeGetStringAllowNull(jsonObject, "originalCustomizedName", null) ?: return null
     val profileJson = JsonHelper.safeGetStringAllowNull(jsonObject, "profileJson", null) ?: return null
-    val iCfg = ICfg.fromJson(jsonObject.optJSONObject("iCfgJson") ?: JSONObject())
+    val iCfg = ICfg.fromJson(jsonObject.optJSONObject("iCfgJson")).let {
+        if (activePlugin.activeInsulin.isValid(it))
+            it
+        else
+            activePlugin.activeInsulin.iCfg
+    }
     val pumpId = JsonHelper.safeGetLongAllowNull(jsonObject, "pumpId", null)
     val pumpType = PumpType.fromString(JsonHelper.safeGetStringAllowNull(jsonObject, "pumpType", null))
     val pumpSerial = JsonHelper.safeGetStringAllowNull(jsonObject, "pumpSerial", null)

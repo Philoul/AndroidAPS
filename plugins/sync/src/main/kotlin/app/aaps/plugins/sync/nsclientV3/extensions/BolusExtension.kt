@@ -9,6 +9,7 @@ import app.aaps.core.nssdk.localmodel.treatment.EventType
 import app.aaps.core.nssdk.localmodel.treatment.NSBolus
 import app.aaps.core.objects.extensions.fromJson
 import app.aaps.core.objects.extensions.toJson
+import org.json.JSONObject
 import java.security.InvalidParameterException
 
 fun NSBolus.toBolus(): BS =
@@ -20,7 +21,7 @@ fun NSBolus.toBolus(): BS =
         type = type.toBolusType(),
         notes = notes,
         isBasalInsulin = isBasalInsulin,
-        iCfg = iCfgJson?.let { ICfg.fromJson(it)},
+        iCfg = ICfg.fromJson(iCfgJson),
         ids = IDs(nightscoutId = identifier, pumpId = pumpId, pumpType = PumpType.fromString(pumpType), pumpSerial = pumpSerial, endId = endId)
     )
 
@@ -34,7 +35,7 @@ fun BS.toNSBolus(): NSBolus =
         date = timestamp,
         utcOffset = T.msecs(utcOffset).mins(),
         insulin = amount,
-        iCfgJson = iCfg?.toJson(),
+        iCfgJson = iCfg?.toJson() ?: JSONObject(),
         type = type.toBolusType(),
         notes = notes,
         isBasalInsulin = isBasalInsulin,

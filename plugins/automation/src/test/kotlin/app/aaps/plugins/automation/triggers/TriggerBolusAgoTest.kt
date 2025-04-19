@@ -1,6 +1,7 @@
 package app.aaps.plugins.automation.triggers
 
 import app.aaps.core.data.model.BS
+import app.aaps.core.data.model.ICfg
 import app.aaps.plugins.automation.elements.Comparator
 import com.google.common.truth.Truth.assertThat
 import org.json.JSONException
@@ -18,6 +19,7 @@ class TriggerBolusAgoTest : TriggerTestBase() {
             BS(
                 timestamp = now,
                 amount = 0.0,
+                iCfg = ICfg("", 45, 7.0),
                 type = BS.Type.NORMAL
             )
         )
@@ -48,6 +50,7 @@ class TriggerBolusAgoTest : TriggerTestBase() {
             BS(
                 timestamp = 0,
                 amount = 0.0,
+                iCfg = ICfg("", 45, 7.0),
                 type = BS.Type.NORMAL
             )
         )

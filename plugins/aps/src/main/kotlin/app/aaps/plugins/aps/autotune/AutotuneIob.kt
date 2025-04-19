@@ -317,6 +317,7 @@ open class AutotuneIob @Inject constructor(
                 ids = bolusInterfaceIDs,
                 timestamp = calcDate,
                 amount = tempBolusSize,
+                iCfg = profile.iCfg(),
                 type = BS.Type.NORMAL
             )
             result.add(tempBolusPart)

@@ -2,6 +2,7 @@ package app.aaps.plugins.sync.tidepool.elements
 
 import app.aaps.core.data.model.BS
 import app.aaps.core.data.model.CA
+import app.aaps.core.data.model.ICfg
 import app.aaps.core.interfaces.utils.DateUtil
 import com.google.gson.annotations.Expose
 import java.util.UUID
@@ -19,6 +20,7 @@ class WizardElement(carbs: CA, dateUtil: DateUtil) : BaseElement(carbs.timestamp
         val fake = BS(
             amount = 0.0001,
             timestamp = carbs.timestamp,
+            iCfg = ICfg("", 0, 0.0),
             type = BS.Type.NORMAL
         )
         bolus = BolusElement(fake, dateUtil) // fake insulin record

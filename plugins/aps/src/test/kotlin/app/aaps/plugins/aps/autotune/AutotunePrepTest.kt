@@ -4,6 +4,7 @@ import app.aaps.core.data.model.BS
 import app.aaps.core.data.model.CA
 import app.aaps.core.data.model.GV
 import app.aaps.core.data.model.GlucoseUnit
+import app.aaps.core.data.model.ICfg
 import app.aaps.core.data.model.SourceSensor
 import app.aaps.core.data.model.TrendArrow
 import app.aaps.core.data.model.data.Block
@@ -228,6 +229,7 @@ class AutotunePrepTest : TestBaseWithProfile() {
                 BS(
                     timestamp = preppedGlucose.crData[i].crEndTime,
                     amount = preppedGlucose.crData[i].crInsulin,
+                    iCfg = ICfg("", 45, 7.0),
                     type = BS.Type.NORMAL
                 )
             )
@@ -237,6 +239,7 @@ class AutotunePrepTest : TestBaseWithProfile() {
                 BS(
                     timestamp = startDayTime,
                     amount = 1.0,
+                    iCfg = ICfg("", 45, 7.0),
                     type = BS.Type.NORMAL
                 )
             )

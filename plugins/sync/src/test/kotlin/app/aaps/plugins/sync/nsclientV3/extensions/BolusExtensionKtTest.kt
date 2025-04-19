@@ -1,6 +1,7 @@
 package app.aaps.plugins.sync.nsclientV3.extensions
 
 import app.aaps.core.data.model.BS
+import app.aaps.core.data.model.ICfg
 import app.aaps.core.data.model.IDs
 import app.aaps.core.data.pump.defs.PumpType
 import app.aaps.core.nssdk.localmodel.treatment.NSBolus
@@ -18,6 +19,7 @@ internal class BolusExtensionKtTest {
             timestamp = 10000,
             isValid = true,
             amount = 1.0,
+            iCfg = ICfg("", 45, 7.0),
             type = BS.Type.SMB,
             notes = "aaaa",
             isBasalInsulin = false,
@@ -37,6 +39,7 @@ internal class BolusExtensionKtTest {
             timestamp = 10000,
             isValid = false,
             amount = 1.0,
+            iCfg = ICfg("", 45, 7.0),
             type = BS.Type.NORMAL,
             notes = "aaaa",
             isBasalInsulin = true,

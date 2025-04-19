@@ -1,6 +1,7 @@
 package app.aaps.plugins.main.extensions
 
 import app.aaps.core.data.model.BS
+import app.aaps.core.data.model.ICfg
 import app.aaps.core.data.time.T
 import app.aaps.core.interfaces.insulin.Insulin
 import app.aaps.core.interfaces.logging.UserEntryLogger
@@ -31,7 +32,7 @@ class BolusExtensionKtTest : TestBaseWithProfile() {
     }
 
     @Test fun iobCalc() {
-        val bolus = BS(timestamp = now - 1, amount = 1.0, type = BS.Type.NORMAL)
+        val bolus = BS(timestamp = now - 1, amount = 1.0, iCfg = ICfg("", 45, 7.0),type = BS.Type.NORMAL)
         // there should be almost full IOB after now
         assertThat(bolus.iobCalc(activePlugin, now, iCfg).iobContrib).isWithin(0.01).of(1.0)
         // there should be less than 5% after DIA -1

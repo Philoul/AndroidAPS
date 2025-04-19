@@ -166,6 +166,7 @@ internal class NSClientV3PluginTest : TestBaseWithProfile() {
             timestamp = 10000,
             isValid = true,
             amount = 1.0,
+            iCfg = ICfg("", 45, 7.0),
             type = BS.Type.SMB,
             notes = "aaaa",
             isBasalInsulin = false,

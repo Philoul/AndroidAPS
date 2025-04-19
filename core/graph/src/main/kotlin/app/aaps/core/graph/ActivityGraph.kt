@@ -26,6 +26,7 @@ class ActivityGraph : GraphView {
         val bolus = BS(
             timestamp = 0,
             amount = 1.0,
+            iCfg = iCfg,
             type = BS.Type.NORMAL
         )
         val activityArray: MutableList<DataPoint> = ArrayList()

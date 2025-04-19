@@ -23,6 +23,7 @@ import app.aaps.core.interfaces.iob.GlucoseStatusProvider
 import app.aaps.core.interfaces.iob.IobCobCalculator
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
+import app.aaps.core.interfaces.plugin.ActivePlugin
 import app.aaps.core.interfaces.plugin.PluginBaseWithPreferences
 import app.aaps.core.interfaces.plugin.PluginDescription
 import app.aaps.core.interfaces.profile.Profile
@@ -93,7 +94,8 @@ class XdripPlugin @Inject constructor(
     private val dateUtil: DateUtil,
     private val config: Config,
     private val decimalFormatter: DecimalFormatter,
-    private val glucoseStatusProvider: GlucoseStatusProvider
+    private val glucoseStatusProvider: GlucoseStatusProvider,
+    private val activePlugin: ActivePlugin
 ) : XDripBroadcast, Sync, PluginBaseWithPreferences(
     pluginDescription = PluginDescription()
         .mainType(PluginType.SYNC)
@@ -366,7 +368,7 @@ class XdripPlugin @Inject constructor(
         val array = JSONArray()
         for (dataPair in dataPairs) {
             when (dataPair) {
-                is DataSyncSelector.PairBolus                  -> dataPair.value.toJson(true, dateUtil)
+                is DataSyncSelector.PairBolus                  -> dataPair.value.toJson(true, dateUtil, activePlugin)
                 is DataSyncSelector.PairCarbs                  -> dataPair.value.toJson(true, dateUtil)
                 is DataSyncSelector.PairBolusCalculatorResult  -> dataPair.value.toJson(true, dateUtil, profileUtil)
                 is DataSyncSelector.PairTemporaryTarget        -> dataPair.value.toJson(true, dateUtil, profileUtil)
@@ -382,8 +384,8 @@ class XdripPlugin @Inject constructor(
                     dataPair.value.toJson(true, profile, dateUtil)
                 }
 
-                is DataSyncSelector.PairProfileSwitch          -> dataPair.value.toJson(true, dateUtil, decimalFormatter)
-                is DataSyncSelector.PairEffectiveProfileSwitch -> dataPair.value.toJson(true, dateUtil)
+                is DataSyncSelector.PairProfileSwitch          -> dataPair.value.toJson(true, dateUtil, decimalFormatter, activePlugin)
+                is DataSyncSelector.PairEffectiveProfileSwitch -> dataPair.value.toJson(true, dateUtil, activePlugin)
                 is DataSyncSelector.PairOfflineEvent           -> dataPair.value.toJson(true, dateUtil)
                 else                                           -> null
             }?.let {

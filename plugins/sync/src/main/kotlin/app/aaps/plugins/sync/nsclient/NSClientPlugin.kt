@@ -14,6 +14,7 @@ import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
 import app.aaps.core.interfaces.nsclient.NSAlarm
 import app.aaps.core.interfaces.nsclient.NSSettingsStatus
+import app.aaps.core.interfaces.plugin.ActivePlugin
 import app.aaps.core.interfaces.plugin.PluginBase
 import app.aaps.core.interfaces.plugin.PluginDescription
 import app.aaps.core.interfaces.profile.Profile
@@ -69,7 +70,8 @@ class NSClientPlugin @Inject constructor(
     private val dateUtil: DateUtil,
     private val profileUtil: ProfileUtil,
     private val nsSettingsStatus: NSSettingsStatus,
-    private val decimalFormatter: DecimalFormatter
+    private val decimalFormatter: DecimalFormatter,
+    private val activePlugin: ActivePlugin
 ) : NsClient, Sync, PluginBase(
     PluginDescription()
         .mainType(PluginType.SYNC)
@@ -193,7 +195,7 @@ class NSClientPlugin @Inject constructor(
 
     override suspend fun nsAdd(collection: String, dataPair: DataSyncSelector.DataPair, progress: String, profile: Profile?): Boolean {
         when (dataPair) {
-            is DataSyncSelector.PairBolus                  -> dataPair.value.toJson(true, dateUtil)
+            is DataSyncSelector.PairBolus                  -> dataPair.value.toJson(true, dateUtil, activePlugin)
             is DataSyncSelector.PairCarbs                  -> dataPair.value.toJson(true, dateUtil)
             is DataSyncSelector.PairBolusCalculatorResult  -> dataPair.value.toJson(true, dateUtil, profileUtil)
             is DataSyncSelector.PairTemporaryTarget        -> dataPair.value.toJson(true, dateUtil, profileUtil)
@@ -203,8 +205,8 @@ class NSClientPlugin @Inject constructor(
             is DataSyncSelector.PairDeviceStatus           -> dataPair.value.toJson(dateUtil)
             is DataSyncSelector.PairTemporaryBasal         -> dataPair.value.toJson(true, profile, dateUtil)
             is DataSyncSelector.PairExtendedBolus          -> dataPair.value.toJson(true, profile, dateUtil)
-            is DataSyncSelector.PairProfileSwitch          -> dataPair.value.toJson(true, dateUtil, decimalFormatter)
-            is DataSyncSelector.PairEffectiveProfileSwitch -> dataPair.value.toJson(true, dateUtil)
+            is DataSyncSelector.PairProfileSwitch          -> dataPair.value.toJson(true, dateUtil, decimalFormatter, activePlugin)
+            is DataSyncSelector.PairEffectiveProfileSwitch -> dataPair.value.toJson(true, dateUtil, activePlugin)
             is DataSyncSelector.PairOfflineEvent           -> dataPair.value.toJson(true, dateUtil)
             is DataSyncSelector.PairProfileStore           -> dataPair.value
             else                                           -> null
@@ -231,7 +233,7 @@ class NSClientPlugin @Inject constructor(
             else                                           -> error("Unsupported data type")
         }
         when (dataPair) {
-            is DataSyncSelector.PairBolus                  -> dataPair.value.toJson(false, dateUtil)
+            is DataSyncSelector.PairBolus                  -> dataPair.value.toJson(false, dateUtil, activePlugin)
             is DataSyncSelector.PairCarbs                  -> dataPair.value.toJson(false, dateUtil)
             is DataSyncSelector.PairBolusCalculatorResult  -> dataPair.value.toJson(false, dateUtil, profileUtil)
             is DataSyncSelector.PairTemporaryTarget        -> dataPair.value.toJson(false, dateUtil, profileUtil)
@@ -240,8 +242,8 @@ class NSClientPlugin @Inject constructor(
             is DataSyncSelector.PairTherapyEvent           -> dataPair.value.toJson(false, dateUtil)
             is DataSyncSelector.PairTemporaryBasal         -> dataPair.value.toJson(false, profile, dateUtil)
             is DataSyncSelector.PairExtendedBolus          -> dataPair.value.toJson(false, profile, dateUtil)
-            is DataSyncSelector.PairProfileSwitch          -> dataPair.value.toJson(false, dateUtil, decimalFormatter)
-            is DataSyncSelector.PairEffectiveProfileSwitch -> dataPair.value.toJson(false, dateUtil)
+            is DataSyncSelector.PairProfileSwitch          -> dataPair.value.toJson(false, dateUtil, decimalFormatter, activePlugin)
+            is DataSyncSelector.PairEffectiveProfileSwitch -> dataPair.value.toJson(false, dateUtil, activePlugin)
             is DataSyncSelector.PairOfflineEvent           -> dataPair.value.toJson(false, dateUtil)
             else                                           -> null
         }?.let { data ->
