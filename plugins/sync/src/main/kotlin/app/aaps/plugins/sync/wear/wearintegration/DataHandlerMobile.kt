@@ -1707,6 +1707,7 @@ class DataHandlerMobile @Inject constructor(
     private fun doBolus(amount: Double, carbs: Int, carbsTime: Long?, carbsDuration: Int, bolusCalculatorResult: BCR?, notes: String? = null) {
         val detailedBolusInfo = DetailedBolusInfo()
         detailedBolusInfo.insulin = amount
+        detailedBolusInfo.iCfg = activePlugin.activeInsulin.iCfg
         detailedBolusInfo.carbs = carbs.toDouble()
         detailedBolusInfo.bolusType = BS.Type.NORMAL
         detailedBolusInfo.carbsTimestamp = carbsTime

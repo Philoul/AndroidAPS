@@ -678,6 +678,7 @@ class LoopPlugin @Inject constructor(
         detailedBolusInfo.lastKnownBolusTime = persistenceLayer.getNewestBolus()?.timestamp ?: 0L
         detailedBolusInfo.eventType = TE.Type.CORRECTION_BOLUS
         detailedBolusInfo.insulin = request.smb
+        detailedBolusInfo.iCfg = activePlugin.activeInsulin.iCfg
         detailedBolusInfo.bolusType = BS.Type.SMB
         detailedBolusInfo.deliverAtTheLatest = request.deliverAt
         aapsLogger.debug(LTag.APS, "applyAPSRequest: bolus()")

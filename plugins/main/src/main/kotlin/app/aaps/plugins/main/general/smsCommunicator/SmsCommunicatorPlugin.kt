@@ -956,6 +956,7 @@ class SmsCommunicatorPlugin @Inject constructor(
                 override fun run() {
                     val detailedBolusInfo = DetailedBolusInfo()
                     detailedBolusInfo.insulin = aDouble()
+                    detailedBolusInfo.iCfg = activePlugin.activeInsulin.iCfg
                     commandQueue.bolus(detailedBolusInfo, object : Callback() {
                         override fun run() {
                             val resultSuccess = result.success

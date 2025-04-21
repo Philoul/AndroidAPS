@@ -15,7 +15,7 @@ data class BS(
     var type: Type,
     var notes: String? = null,
     var isBasalInsulin: Boolean = false,
-    var icfg: ICfg? = null
+    var iCfg: ICfg? = null
 ) : HasIDs {
 
     fun contentEqualsTo(other: BS): Boolean =

@@ -424,6 +424,7 @@ class BolusWizard @Inject constructor(
             DetailedBolusInfo().apply {
                 eventType = TE.Type.CORRECTION_BOLUS
                 insulin = insulinAfterConstraints
+                this.iCfg = activePlugin.activeInsulin.iCfg
                 carbs = 0.0
                 context = ctx
                 mgdlGlucose = profileUtil.convertToMgdl(bg, profile.units)
@@ -512,6 +513,7 @@ class BolusWizard @Inject constructor(
                 DetailedBolusInfo().apply {
                     eventType = TE.Type.BOLUS_WIZARD
                     insulin = insulinAfterConstraints
+                    this.iCfg = activePlugin.activeInsulin.iCfg
                     carbs = this@BolusWizard.carbs.toDouble()
                     context = ctx
                     mgdlGlucose = profileUtil.convertToMgdl(bg, profile.units)

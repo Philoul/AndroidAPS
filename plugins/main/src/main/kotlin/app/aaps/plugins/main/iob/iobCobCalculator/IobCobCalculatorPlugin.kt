@@ -576,6 +576,7 @@ class IobCobCalculatorPlugin @Inject constructor(
             val bolus = BS(
                 timestamp = i,
                 amount = running * 5.0 / 60.0,
+                iCfg = profile.iCfg(),
                 type = BS.Type.NORMAL,
                 isBasalInsulin = true
             )

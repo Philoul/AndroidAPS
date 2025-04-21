@@ -182,6 +182,7 @@ class TreatmentDialog : DialogFragmentWithDate() {
                     if (insulinAfterConstraints == 0.0) detailedBolusInfo.eventType = TE.Type.CARBS_CORRECTION
                     if (carbsAfterConstraints == 0) detailedBolusInfo.eventType = TE.Type.CORRECTION_BOLUS
                     detailedBolusInfo.insulin = insulinAfterConstraints
+                    detailedBolusInfo.iCfg = activePlugin.activeInsulin.iCfg
                     detailedBolusInfo.carbs = carbsAfterConstraints.toDouble()
                     detailedBolusInfo.context = context
                     if (recordOnlyChecked) {
