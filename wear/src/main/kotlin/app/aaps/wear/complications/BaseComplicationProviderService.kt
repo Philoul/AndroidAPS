@@ -138,6 +138,7 @@ abstract class BaseComplicationProviderService : ComplicationProviderService() {
                     builder.setLongText(ComplicationText.plainText(getString(R.string.label_warning_sync_aaps)))
                 }
             }
+            ComplicationData.TYPE_SMALL_IMAGE                                                                -> return buildComplicationData(dataType, raw, complicationPendingIntent)
 
             ComplicationData.TYPE_LARGE_IMAGE                                                                -> return buildComplicationData(dataType, raw, complicationPendingIntent)
             else                                                                                             -> aapsLogger.warn(LTag.WEAR, "Unexpected complication type $dataType")
