@@ -70,7 +70,7 @@ class StatusLightHandler @Inject constructor(
                 IntKey.OverviewResCritical, IntKey.OverviewResWarning,
                 ch.fromPump(pump.reservoirLevel),
                 insulinUnit,
-                pump.pumpDescription.maxResorvoirReading.toDouble()
+                ch.fromPump(pump.pumpDescription.maxResorvoirReading.toDouble())
             )
         } else {
             handleLevel(reservoirLevel, IntKey.OverviewResCritical, IntKey.OverviewResWarning, ch.fromPump(pump.reservoirLevel), insulinUnit)
