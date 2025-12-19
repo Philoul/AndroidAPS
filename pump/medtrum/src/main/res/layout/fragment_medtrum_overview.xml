@@ -242,7 +242,7 @@
                             android:gravity="start"
                             android:paddingStart="5dp"
                             android:paddingEnd="5dp"
-                            android:text='@{@string/current_basal_rate(viewmodel.medtrumPump.lastBasalRateFlow)}'
+                            android:text='@{viewmodel.medtrumPump.lastBasalRateFlow}'
                             android:textSize="14sp" />
                     </LinearLayout>
 
@@ -456,7 +456,7 @@
                             android:gravity="start"
                             android:paddingStart="5dp"
                             android:paddingEnd="5dp"
-                            android:text='@{@string/reservoir_level(viewmodel.medtrumPump.reservoirFlow)}'
+                            android:text='@{viewmodel.medtrumPump.reservoirStringFlow}'
                             android:textSize="14sp" />
                     </LinearLayout>
 

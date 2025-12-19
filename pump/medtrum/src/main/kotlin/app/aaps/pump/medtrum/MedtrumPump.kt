@@ -4,6 +4,7 @@ import android.util.Base64
 import app.aaps.core.data.model.TE
 import app.aaps.core.data.pump.defs.PumpType
 import app.aaps.core.data.time.T
+import app.aaps.core.interfaces.insulin.ConcentrationHelper
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
 import app.aaps.core.interfaces.profile.Profile
@@ -43,7 +44,8 @@ class MedtrumPump @Inject constructor(
     private val preferences: Preferences,
     private val dateUtil: DateUtil,
     private val pumpSync: PumpSync,
-    private val temporaryBasalStorage: TemporaryBasalStorage
+    private val temporaryBasalStorage: TemporaryBasalStorage,
+    private val ch: ConcentrationHelper
 ) {
 
     companion object {
@@ -102,15 +104,19 @@ class MedtrumPump @Inject constructor(
         get() = _lastBasalType.value
 
     private val _lastBasalRate = MutableStateFlow(0.0)
-    val lastBasalRateFlow: StateFlow<Double> = _lastBasalRate
+    private val _lastBasalStringRate = MutableStateFlow("")
+    val lastBasalRateFlow: StateFlow<String> = _lastBasalStringRate
     val lastBasalRate: Double
         get() = _lastBasalRate.value
 
-    private val _reservoir = MutableStateFlow(0.0)
+    private var _reservoir = MutableStateFlow(0.0)
+    private val _reservoirString = MutableStateFlow("")
     val reservoirFlow: StateFlow<Double> = _reservoir
+    val reservoirStringFlow: StateFlow<String> = _reservoirString
     var reservoir: Double
         get() = _reservoir.value
         set(value) {
+            _reservoirString.value = ch.insulinAmountString(value)
             _reservoir.value = value
         }
 
@@ -491,6 +497,7 @@ class MedtrumPump @Inject constructor(
         // Update medtrum pump state
         _lastBasalType.value = basalType
         _lastBasalRate.value = basalRate
+        _lastBasalStringRate.value = ch.basalRateString(basalRate)
         _lastBasalSequence = basalSequence
         if (basalSequence > currentSequenceNumber) {
             currentSequenceNumber = basalSequence
@@ -520,6 +527,7 @@ class MedtrumPump @Inject constructor(
             setFakeTBR()
             _lastBasalType.value = BasalType.NONE
             _lastBasalRate.value = 0.0
+            _lastBasalStringRate.value = ch.basalRateString(0.0)
         }
     }
 
