@@ -6,6 +6,7 @@ import androidx.preference.PreferenceFragmentCompat
 import androidx.wear.tiles.TileService
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
+import app.aaps.wear.R
 import app.aaps.wear.preference.WearPreferenceActivity
 import app.aaps.wear.tile.ActionsTileService
 import app.aaps.wear.tile.TempTargetTileService
@@ -32,7 +33,7 @@ class TileConfigurationActivity : WearPreferenceActivity() {
         view.requestFocus()
 
         // Set background after super.onCreate()
-        window.decorView.setBackgroundResource(app.aaps.wear.R.drawable.tile_config_background)
+        window.decorView.setBackgroundResource(R.drawable.settings_background)
 
         // Add padding to the content view for spacing from top and bottom
         val contentView = findViewById<ViewGroup>(android.R.id.content)
@@ -42,8 +43,8 @@ class TileConfigurationActivity : WearPreferenceActivity() {
     override fun createPreferenceFragment(): PreferenceFragmentCompat {
         // Map action strings to resource IDs directly instead of using reflection
         val resXmlId = when (configFileName) {
-            "tile_configuration_activity" -> app.aaps.wear.R.xml.tile_configuration_activity
-            "tile_configuration_tempt"    -> app.aaps.wear.R.xml.tile_configuration_tempt
+            "tile_configuration_activity" -> R.xml.tile_configuration_activity
+            "tile_configuration_tempt"    -> R.xml.tile_configuration_tempt
             else -> {
                 0
             }

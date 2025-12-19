@@ -18,9 +18,10 @@ import java.text.DecimalFormat
 
 class WizardActivity : ViewSelectorActivity() {
 
-    var editCarbs: PlusMinusEditText? = null
-    var editPercentage: PlusMinusEditText? = null
-    var hasPercentage = false
+    private var editCarbs: PlusMinusEditText? = null
+    private var editPercentage: PlusMinusEditText? = null
+    private var hasPercentage = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         hasPercentage = sp.getBoolean(R.string.key_wizard_percentage, false)
@@ -38,62 +39,110 @@ class WizardActivity : ViewSelectorActivity() {
 
         private val increment1 = preferences.get(IntKey.OverviewCarbsButtonIncrement1).toDouble()
         private val increment2 = preferences.get(IntKey.OverviewCarbsButtonIncrement2).toDouble()
-        val stepValues = listOf(1.0, increment1, increment2)
+        private val stepValues = listOf(1.0, increment1, increment2)
 
         override fun instantiateItem(container: ViewGroup, position: Int): View = when (position) {
-            0                  -> {
-                // Page 0: Carbs input page
-                val frameLayout = FrameLayout(applicationContext).apply {
-                    layoutParams = ViewGroup.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT
-                    )
-                }
-                val viewAdapter = EditPlusMinusViewAdapter.getViewAdapter(sp, applicationContext, frameLayout, true)
-                val maxCarbs = sp.getInt(getString(R.string.key_treatments_safety_max_carbs), 48).toDouble()
-                val initValue = SafeParse.stringToDouble(editCarbs?.editText?.text.toString(), 0.0)
-                editCarbs = PlusMinusEditText(viewAdapter, initValue, 0.0, maxCarbs, stepValues, DecimalFormat("0"), false, getString(R.string.action_carbs_gram))
-                viewAdapter.root.apply {
-                    layoutParams = ViewGroup.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT
-                    )
-                }
+            0                  -> createCarbsInputPage()
+            1 if hasPercentage -> createPercentageInputPage()
+            else               -> createConfirmPage(container)
+        }
+
+        private fun createCarbsInputPage(): View {
+            val frameLayout = FrameLayout(applicationContext).apply {
+                layoutParams = ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
             }
-            1 if hasPercentage -> {
-                // Page 1: Percentage input page (only if hasPercentage is true)
-                val frameLayout = FrameLayout(applicationContext).apply {
-                    layoutParams = ViewGroup.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT
-                    )
-                }
-                val viewAdapter = EditPlusMinusViewAdapter.getViewAdapter(sp, applicationContext, frameLayout, false)
-                val percentage = sp.getInt(getString(R.string.key_bolus_wizard_percentage), 100).toDouble()
-                val initValue = SafeParse.stringToDouble(editPercentage?.editText?.text.toString(), percentage)
-                editPercentage = PlusMinusEditText(viewAdapter, initValue, 10.0, 200.0, 5.0, DecimalFormat("0"), false, getString(R.string.action_percentage))
-                viewAdapter.root.apply {
-                    layoutParams = ViewGroup.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT
-                    )
-                }
+            val viewAdapter = EditPlusMinusViewAdapter.getViewAdapter(sp, applicationContext, frameLayout, true)
+            val maxCarbs = sp.getInt(getString(R.string.key_treatments_safety_max_carbs), 48).toDouble()
+            val initValue = SafeParse.stringToDouble(editCarbs?.editText?.text.toString(), 0.0)
+
+            editCarbs = PlusMinusEditText(
+                viewAdapter,
+                initValue,
+                0.0,
+                maxCarbs,
+                stepValues,
+                DecimalFormat("0"),
+                false,
+                getString(R.string.action_carbs_gram)
+            )
+
+            return viewAdapter.root.apply {
+                layoutParams = ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
             }
-            else               -> {
-                // Page 2 (or 1 if no percentage): Confirm page
-                LayoutInflater.from(applicationContext).inflate(R.layout.action_confirm_ok, container, false).apply {
-                    findViewById<ImageView>(R.id.confirmbutton)
-                        .setOnClickListener {
-                            val percentage = if (hasPercentage) SafeParse.stringToInt(editPercentage?.editText?.text.toString()) else sp.getInt(getString(R.string.key_bolus_wizard_percentage), 100)
-                            rxBus.send(EventWearToMobile(ActionWizardPreCheck(SafeParse.stringToInt(editCarbs?.editText?.text.toString()), percentage)))
-                            showToast(this@WizardActivity, R.string.action_wizard_confirmation)
-                            finishAffinity()
-                        }
+        }
+
+        private fun createPercentageInputPage(): View {
+            val frameLayout = FrameLayout(applicationContext).apply {
+                layoutParams = ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
+            }
+            val viewAdapter = EditPlusMinusViewAdapter.getViewAdapter(sp, applicationContext, frameLayout, false)
+            val percentage = sp.getInt(getString(R.string.key_bolus_wizard_percentage), 100).toDouble()
+            val initValue = SafeParse.stringToDouble(editPercentage?.editText?.text.toString(), percentage)
+
+            editPercentage = PlusMinusEditText(
+                viewAdapter,
+                initValue,
+                10.0,
+                200.0,
+                5.0,
+                DecimalFormat("0"),
+                false,
+                getString(R.string.action_percentage)
+            )
+
+            return viewAdapter.root.apply {
+                layoutParams = ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
+            }
+        }
+
+        private fun createConfirmPage(container: ViewGroup): View {
+            return LayoutInflater.from(applicationContext)
+                .inflate(R.layout.action_confirm_ok, container, false)
+                .apply {
+                    findViewById<ImageView>(R.id.confirmbutton).setOnClickListener { view ->
+                        // Visual feedback
+                        view.animate()
+                            .scaleX(1.2f)
+                            .scaleY(1.2f)
+                            .setDuration(150)
+                            .start()
+
+                        // Haptic feedback
+                        view.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM)
+
+                        // Send wizard action
+                        val percentage = getPercentageValue()
+                        val carbs = SafeParse.stringToInt(editCarbs?.editText?.text.toString())
+                        rxBus.send(EventWearToMobile(ActionWizardPreCheck(carbs, percentage)))
+
+                        showToast(this@WizardActivity, R.string.action_wizard_confirmation)
+                        finishAffinity()
+                    }
+
                     layoutParams = ViewGroup.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.MATCH_PARENT
                     )
                 }
+        }
+
+        private fun getPercentageValue(): Int {
+            return if (hasPercentage) {
+                SafeParse.stringToInt(editPercentage?.editText?.text.toString())
+            } else {
+                sp.getInt(getString(R.string.key_bolus_wizard_percentage), 100)
             }
         }
     }

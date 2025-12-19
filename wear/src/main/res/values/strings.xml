@@ -296,8 +296,6 @@
     <string name="wizard_calculation">Calculation</string>
     <string name="wizard_carbs_format">%1$d g carbs</string>
     <string name="wizard_settings_format">IC: %1$s | ISF: %2$s</string>
-    <string name="wizard_percentage_label">Percentage</string>
-    <string name="wizard_bolus_delivered">Bolus delivered</string>
     <string name="wizard_swipe_left_confirm">Swipe left to confirm</string>
     <string name="wizard_result_bg">BG</string>
     <string name="wizard_result_bg_tt">BG (TT: %1$s)</string>
@@ -312,4 +310,5 @@
     <string name="wizard_result_correction_percentage">Corr. %1$d%%</string>
     <string name="expand_calculation_details">Click to expand calculation details</string>
     <string name="wizard_confirmation_sent">Sent</string>
+    <string name="tile_settings">Tile settings</string>
 </resources>

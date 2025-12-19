@@ -160,6 +160,7 @@ abstract class BaseWatchFace : WatchFace() {
     private var sgvTapTime: Long = 0
     private var chartTapTime: Long = 0
     private var mainMenuTapTime: Long = 0
+    private var lastMenuOpenTime: Long = 0
 
     // related endTime manual layout
     var layoutView: View? = null
@@ -225,6 +226,11 @@ abstract class BaseWatchFace : WatchFace() {
     }
 
     override fun onTapCommand(tapType: Int, x: Int, y: Int, eventTime: Long) {
+        // Only respond to actual taps (tapType=2), ignore touch-down (tapType=0) and other events
+        if (tapType != 2) {
+            return
+        }
+
         binding.chart?.let { chart ->
             if (x >= chart.left && x <= chart.right && y >= chart.top && y <= chart.bottom) {
                 if (eventTime - chartTapTime < 800) {
@@ -234,15 +240,22 @@ abstract class BaseWatchFace : WatchFace() {
                 return
             }
         }
+
         binding.sgv?.let { mSgv ->
-            val extra = (mSgv.right - mSgv.left) / 2
-            if (x + extra >= mSgv.left && x - extra <= mSgv.right && y >= mSgv.top && y <= mSgv.bottom) {
-                if (eventTime - sgvTapTime < 800) {
-                    startActivity(Intent(this, MainMenuActivity::class.java).also { it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) })
+            if (x >= mSgv.left && x <= mSgv.right && y >= mSgv.top && y <= mSgv.bottom) {
+                if (eventTime - sgvTapTime < 800 && sgvTapTime != 0L) {
+                    if (eventTime - lastMenuOpenTime > 2000) {
+                        lastMenuOpenTime = eventTime
+                        startActivity(Intent(this, MainMenuActivity::class.java).also { it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) })
+                    }
+                    sgvTapTime = 0
+                } else {
+                    sgvTapTime = eventTime
                 }
-                sgvTapTime = eventTime
+                return
             }
         }
+
         binding.chartZoomTap?.let { mChartTap ->
             if (x >= mChartTap.left && x <= mChartTap.right && y >= mChartTap.top && y <= mChartTap.bottom) {
                 if (eventTime - chartTapTime < 800) {
@@ -252,22 +265,29 @@ abstract class BaseWatchFace : WatchFace() {
                 return
             }
         }
+
         binding.mainMenuTap?.let { mMainMenuTap ->
-            // TAP_TYPE_TAP constant removed in AndroidX API - accept all tap types
             if (x >= mMainMenuTap.left && x <= mMainMenuTap.right && y >= mMainMenuTap.top && y <= mMainMenuTap.bottom) {
-                if (eventTime - mainMenuTapTime < 800) {
-                    startActivity(Intent(this, MainMenuActivity::class.java).also { it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) })
+                if (eventTime - mainMenuTapTime < 800 && mainMenuTapTime != 0L) {
+                    if (eventTime - lastMenuOpenTime > 2000) {
+                        lastMenuOpenTime = eventTime
+                        startActivity(Intent(this, MainMenuActivity::class.java).also { it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) })
+                    }
+                    mainMenuTapTime = 0
+                } else {
+                    mainMenuTapTime = eventTime
                 }
-                mainMenuTapTime = eventTime
                 return
             }
         }
     }
 
     open fun changeChartTimeframe() {
-        var timeframe = sp.getInt(R.string.key_chart_time_frame, 3)
-        timeframe = timeframe % 5 + 1
-        sp.putString(R.string.key_chart_time_frame, timeframe.toString())
+        val currentTimeframe = sp.getString(R.string.key_chart_time_frame, "3").toIntOrNull() ?: 3
+        val newTimeframe = currentTimeframe % 5 + 1
+        sp.putString(R.string.key_chart_time_frame, newTimeframe.toString())
+        setupCharts()  // Rebuild the chart with new timeframe
+        invalidate()   // Trigger redraw
     }
 
     // getWatchFaceStyle removed - not used in AndroidX API (tap events always accepted)
@@ -670,7 +690,7 @@ abstract class BaseWatchFace : WatchFace() {
         }
         if (!::binding.isInitialized) return
         if (binding.chart != null && graphData.entries.isNotEmpty()) {
-            val timeframe = sp.getInt(R.string.key_chart_time_frame, 3)
+            val timeframe = sp.getString(R.string.key_chart_time_frame, "3").toIntOrNull() ?: 3  // Changed from getInt
             val bgGraphBuilder =
                 if (lowResMode)
                     BgGraphBuilder(

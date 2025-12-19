@@ -98,6 +98,8 @@ class CircleWatchface : WatchFace() {
     private var myLayout: View? = null
     private var mSgv: TextView? = null
     private var sgvTapTime: Long = 0
+    private var lastMenuOpenTime: Long = 0
+
 
     override fun onCreate() {
         AndroidInjection.inject(this)
@@ -447,17 +449,25 @@ class CircleWatchface : WatchFace() {
     }
 
     override fun onTapCommand(tapType: Int, x: Int, y: Int, eventTime: Long) {
+        // Only respond to actual taps (tapType=2), ignore touch-down (tapType=0) and other events
+        if (tapType != 2) {
+            return
+        }
+
         mSgv?.let { mSgv ->
-            val extra = (mSgv.right - mSgv.left) / 2
-            if (x + extra >= mSgv.left && x - extra <= mSgv.right && y >= mSgv.top && y <= mSgv.bottom) {
-                if (eventTime - sgvTapTime < 800) {
-                    val intent = Intent(this, MainMenuActivity::class.java)
-                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    startActivity(intent)
+            if (x >= mSgv.left && x <= mSgv.right && y >= mSgv.top && y <= mSgv.bottom) {
+                if (eventTime - sgvTapTime < 800 && sgvTapTime != 0L) {
+                    if (eventTime - lastMenuOpenTime > 2000) {
+                        lastMenuOpenTime = eventTime
+                        val intent = Intent(this, MainMenuActivity::class.java)
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        startActivity(intent)
+                    }
+                    sgvTapTime = 0
+                } else {
+                    sgvTapTime = eventTime
                 }
-                sgvTapTime = eventTime
             }
         }
     }
-
 }

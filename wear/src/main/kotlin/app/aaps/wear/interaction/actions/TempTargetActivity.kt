@@ -111,9 +111,17 @@ class TempTargetActivity : ViewSelectorActivity() {
                 // Page 3 (or 2 if single target): Confirm page
                 LayoutInflater.from(applicationContext).inflate(R.layout.action_confirm_ok, container, false).apply {
                     val confirmButton = findViewById<ImageView>(R.id.confirmbutton)
-                    confirmButton.setOnClickListener {
-                        // check if it can happen that the fragment is never created that hold data?
-                        // (you have to swipe past them anyways - but still)
+                    confirmButton.setOnClickListener { view ->
+                        // Visual feedback: scale animation
+                        view.animate()
+                            .scaleX(1.2f)
+                            .scaleY(1.2f)
+                            .setDuration(150)
+                            .start()
+
+                        // Haptic feedback
+                        view.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM)
+
                         val action = ActionTempTargetPreCheck(
                             ActionTempTargetPreCheck.TempTargetCommand.MANUAL,
                             isMGDL,

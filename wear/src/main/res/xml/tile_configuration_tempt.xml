@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <PreferenceCategory
+        android:title="@string/tile_settings"
+        android:key="header" />
+
     <ListPreference
         android:defaultValue="activity"
         android:entries="@array/tile_tempt_names"

@@ -88,7 +88,17 @@ class AcceptActivity : ViewSelectorActivity() {
                 // Page 1: Confirm page
                 LayoutInflater.from(applicationContext).inflate(R.layout.action_confirm_ok, container, false).apply {
                     val confirmButton = findViewById<ImageView>(R.id.confirmbutton)
-                    confirmButton.setOnClickListener {
+                    confirmButton.setOnClickListener { view ->
+                        // Visual feedback: scale animation
+                        view.animate()
+                            .scaleX(1.2f)
+                            .scaleY(1.2f)
+                            .setDuration(150)
+                            .start()
+
+                        // Haptic feedback
+                        view.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM)
+
                         if (actionKey.isNotEmpty()) startService(IntentWearToMobile(this@AcceptActivity, actionKey))
                         startForegroundService(IntentCancelNotification(this@AcceptActivity))
                         finishAffinity()
