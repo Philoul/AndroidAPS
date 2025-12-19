@@ -190,7 +190,7 @@ class TizenPlugin @Inject constructor(
     private fun pumpStatus(bundle: Bundle) {
         val pump = activePlugin.activePump
         bundle.putLong("pumpTimeStamp", pump.lastDataTime)
-        bundle.putInt("pumpBattery", pump.batteryLevel)
+        pump.batteryLevel?.let { bundle.putInt("pumpBattery", it) }
         bundle.putDouble("pumpReservoir", ch.fromPump(pump.reservoirLevel))
         bundle.putString("pumpStatus", pumpStatusProvider.shortStatus(false))
     }

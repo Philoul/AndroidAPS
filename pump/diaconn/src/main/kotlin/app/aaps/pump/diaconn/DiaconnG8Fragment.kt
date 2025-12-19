@@ -143,13 +143,19 @@ class DiaconnG8Fragment : DaggerFragment() {
     override fun onPause() {
         super.onPause()
         disposable.clear()
-        handler.removeCallbacks(refreshLoop)
+        handler.removeCallbacksAndMessages(null)
     }
 
     @Synchronized
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        handler.removeCallbacksAndMessages(null)
+        handler.looper.quitSafely()
     }
 
     @SuppressLint("SetTextI18n")
@@ -188,8 +194,8 @@ class DiaconnG8Fragment : DaggerFragment() {
         binding.extendedbolus.text = diaconnG8Pump.extendedBolusToString()
         binding.reservoir.text = rh.gs(R.string.reservoir_value, pump.systemRemainInsulin, 307)
         warnColors.setColorInverse(binding.reservoir, pump.systemRemainInsulin, 50, 20)
-        binding.battery.text = "{fa-battery-" + pump.systemRemainBattery / 25 + "}" + " (" + pump.systemRemainBattery + " %)"
-        warnColors.setColorInverse(binding.battery, pump.systemRemainBattery.toDouble(), 51, 26)
+        binding.battery.text = pump.systemRemainBattery?.let { "{fa-battery-" + it / 25 + "}" } ?: rh.gs(app.aaps.core.ui.R.string.unknown)
+        warnColors.setColorInverse(binding.battery, (pump.systemRemainBattery?.toDouble() ?: 100.0), 51, 26)
         binding.firmware.text =
             rh.gs(app.aaps.pump.diaconn.R.string.diaconn_g8_pump) + "\nVersion: " + pump.majorVersion.toString() + "." + pump.minorVersion.toString() + "\nCountry: " + pump.country.toString() + "\nProductType: " + pump.productType.toString() + "\nManufacture: " + pump.makeYear + "." + pump.makeMonth + "." + pump.makeDay
         binding.basalstep.text = pump.basalStep.toString()

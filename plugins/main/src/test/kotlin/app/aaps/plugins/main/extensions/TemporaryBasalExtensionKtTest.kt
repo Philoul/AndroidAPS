@@ -6,7 +6,6 @@ import app.aaps.core.data.time.T
 import app.aaps.core.interfaces.aps.AutosensResult
 import app.aaps.core.interfaces.db.PersistenceLayer
 import app.aaps.core.interfaces.insulin.Insulin
-import app.aaps.core.interfaces.profile.ProfileFunction
 import app.aaps.core.interfaces.ui.UiInteraction
 import app.aaps.core.objects.extensions.iobCalc
 import app.aaps.plugins.insulin.InsulinLyumjevPlugin
@@ -15,7 +14,7 @@ import com.google.common.truth.Truth.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mock
-import org.mockito.Mockito
+import org.mockito.kotlin.whenever
 
 class TemporaryBasalExtensionKtTest : TestBaseWithProfile() {
 
@@ -29,8 +28,8 @@ class TemporaryBasalExtensionKtTest : TestBaseWithProfile() {
     @BeforeEach
     fun setup() {
         insulin = InsulinLyumjevPlugin(rh, preferences, aapsSchedulers, fabricPrivacy, persistenceLayer, profileFunction, rxBus, aapsLogger, config, hardLimits, uiInteraction, context)
-        Mockito.`when`(activePlugin.activeInsulin).thenReturn(insulin)
-        Mockito.`when`(dateUtil.now()).thenReturn(now)
+        whenever(activePlugin.activeInsulin).thenReturn(insulin)
+        whenever(dateUtil.now()).thenReturn(now)
     }
 
     @Test

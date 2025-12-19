@@ -23,7 +23,7 @@ class TestPumpPlugin(val rh: ResourceHelper, val ch: ConcentrationHelper) : Pump
     override fun isConnected() = connected
     override fun isConnecting() = false
     override fun isHandshakeInProgress() = false
-    val lastData = 0L
+    var lastData = 0L
 
     val baseBasal = 0.0
     override var pumpDescription = PumpDescription()
@@ -55,7 +55,7 @@ class TestPumpPlugin(val rh: ResourceHelper, val ch: ConcentrationHelper) : Pump
     override val lastDataTime: Long get() = lastData
     override val baseBasalRate: Double get() = baseBasal
     override val reservoirLevel: Double = 0.0
-    override val batteryLevel: Int = 0
+    override val batteryLevel: Int? = null
     override fun deliverTreatment(detailedBolusInfo: DetailedBolusInfo): PumpEnactResult = PumpEnactResultObject(rh, ch).success(true)
     override fun stopBolusDelivering() { /* not needed */
     }

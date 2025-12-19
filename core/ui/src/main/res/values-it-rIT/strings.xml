@@ -416,6 +416,9 @@
     <string name="uel_loop_change">LOOP CAMBIATO</string>
     <string name="uel_loop_removed">LOOP RIMOSSO</string>
     <string name="uel_other">ALTRO</string>
+    <string name="uel_running_mode">MODALITÀ RUNNING</string>
+    <string name="uel_running_mode_removed">MODALITÀ RUNNING RIMOSSA</string>
+    <string name="uel_running_mode_updarted">MODALITÀ RUNNING AGGIORNATA</string>
     <!-- HardLimits -->
     <string name="profile_low_target">Target basso (profilo)</string>
     <string name="profile_high_target">Target alto (profilo)</string>
@@ -639,4 +642,6 @@
     <string name="rate_percent_duration">Velocità: %1$.2f U/h (%2$.2f%%) Durata: %3$d min</string>
     <string name="percent_rate_duration_formatted"><![CDATA[<b>Velocità</b>: %1$.2f%% (%2$.2f U/h)<br><b>Durata</b>: %3$d min<br>]]></string>
     <string name="rate_percent_duration_formatted"><![CDATA[<b>Velocità</b>: %1$.2f U/h (%2$.2f%%) <br><b>Durata</b>: %3$d min<br>]]></string>
+    <!--    Playback-->
+    <string name="audio_playback_attribution">"AAPS riproduce audio"</string>
 </resources>

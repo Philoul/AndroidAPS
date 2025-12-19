@@ -2,8 +2,6 @@ package app.aaps.plugins.sync.wear.wearintegration
 
 import android.app.NotificationManager
 import android.content.Context
-import android.os.Handler
-import android.os.HandlerThread
 import app.aaps.core.data.configuration.Constants
 import app.aaps.core.data.iob.InMemoryGlucoseValue
 import app.aaps.core.data.model.BCR
@@ -80,6 +78,7 @@ import app.aaps.core.objects.wizard.QuickWizard
 import app.aaps.core.objects.wizard.QuickWizardEntry
 import app.aaps.core.ui.toast.ToastUtils
 import app.aaps.plugins.sync.R
+import io.reactivex.rxjava3.core.Completable
 import io.reactivex.rxjava3.disposables.CompositeDisposable
 import io.reactivex.rxjava3.kotlin.plusAssign
 import java.text.DateFormat
@@ -98,7 +97,7 @@ import kotlin.math.min
 
 @Singleton
 class DataHandlerMobile @Inject constructor(
-    aapsSchedulers: AapsSchedulers,
+    private val aapsSchedulers: AapsSchedulers,
     private val context: Context,
     private val rxBus: RxBus,
     private val aapsLogger: AAPSLogger,
@@ -132,7 +131,6 @@ class DataHandlerMobile @Inject constructor(
 
     @Inject lateinit var automation: Automation
     private val disposable = CompositeDisposable()
-    private var handler = Handler(HandlerThread(this::class.simpleName + "Handler").also { it.start() }.looper)
 
     private var lastBolusWizard: BolusWizard? = null
     private var lastQuickWizardEntry: QuickWizardEntry? = null
@@ -494,6 +492,13 @@ class DataHandlerMobile @Inject constructor(
         }
         val tempTarget = persistenceLayer.getTemporaryTargetActiveAt(dateUtil.now())
 
+        // Store the preference values before calling doCalc
+        val useBgPref = preferences.get(BooleanKey.WearWizardBg)
+        val useCobPref = preferences.get(BooleanKey.WearWizardCob)
+        val useIobPref = preferences.get(BooleanKey.WearWizardIob)
+        val useTTPref = preferences.get(BooleanKey.WearWizardTt)
+        val useTrendPref = preferences.get(BooleanKey.WearWizardTrend)
+
         val bolusWizard = bolusWizardProvider.get().doCalc(
             profile = profile,
             profileName = profileName,
@@ -503,13 +508,13 @@ class DataHandlerMobile @Inject constructor(
             bg = bgReading.valueToUnits(profileFunction.getUnits()),
             correction = 0.0,
             percentageCorrection = percentage,
-            useBg = preferences.get(BooleanKey.WearWizardBg),
-            useCob = preferences.get(BooleanKey.WearWizardCob),
-            includeBolusIOB = preferences.get(BooleanKey.WearWizardIob),
-            includeBasalIOB = preferences.get(BooleanKey.WearWizardIob),
+            useBg = useBgPref,
+            useCob = useCobPref,
+            includeBolusIOB = useIobPref,
+            includeBasalIOB = useIobPref,
             useSuperBolus = false,
-            useTT = preferences.get(BooleanKey.WearWizardTt),
-            useTrend = preferences.get(BooleanKey.WearWizardTrend),
+            useTT = useTTPref,
+            useTrend = useTrendPref,
             useAlarm = false
         )
         val insulinAfterConstraints = bolusWizard.insulinAfterConstraints
@@ -522,18 +527,35 @@ class DataHandlerMobile @Inject constructor(
             sendError(rh.gs(app.aaps.core.ui.R.string.wizard_no_insulin_required))
             return
         }
-        val message =
-            rh.gs(R.string.wizard_result, bolusWizard.calculatedTotalInsulin, bolusWizard.carbs) + "\n_____________\n" + bolusWizard.explainShort()
+
+        // Format temp target string if present
+        val tempTargetString = if (useTTPref && tempTarget != null) {
+            profileUtil.toTargetRangeString(tempTarget.lowTarget, tempTarget.highTarget, GlucoseUnit.MGDL)
+        } else null
+
+        // Build structured wizard result
+        // Use the public properties that ARE available
+        val wizardResult = EventData.ActionWizardResult(
+            timestamp = bolusWizard.timeStamp,
+            totalInsulin = bolusWizard.calculatedTotalInsulin,
+            carbs = bolusWizard.carbs,
+            ic = bolusWizard.ic,
+            sens = bolusWizard.sens,
+            insulinFromCarbs = bolusWizard.insulinFromCarbs,
+            insulinFromBG = if (useBgPref) bolusWizard.insulinFromBG else null,
+            insulinFromCOB = if (useCobPref) bolusWizard.insulinFromCOB else null,
+            insulinFromBolusIOB = if (useIobPref) -bolusWizard.insulinFromBolusIOB else null,
+            insulinFromBasalIOB = if (useIobPref) -bolusWizard.insulinFromBasalIOB else null,
+            insulinFromTrend = if (useTrendPref) bolusWizard.insulinFromTrend else null,
+            insulinFromSuperBolus = null,
+            tempTarget = tempTargetString,
+            percentageCorrection = if (percentage != 100) percentage else null,
+            totalBeforePercentage = if (percentage != 100) bolusWizard.totalBeforePercentageAdjustment else null,
+            cob = bolusWizard.cob
+        )
         lastBolusWizard = bolusWizard
         lastQuickWizardEntry = null
-        rxBus.send(
-            EventMobileToWear(
-                EventData.ConfirmAction(
-                    rh.gs(app.aaps.core.ui.R.string.confirm).uppercase(), message,
-                    returnCommand = EventData.ActionWizardConfirmed(bolusWizard.timeStamp)
-                )
-            )
-        )
+        rxBus.send(EventMobileToWear(wizardResult))
     }
 
     private fun handleUserActionPreCheck(command: EventData.ActionUserActionPreCheck) {
@@ -569,7 +591,9 @@ class DataHandlerMobile @Inject constructor(
             val events = automation.userEvents()
             events.find { it.hashCode() == command.id }?.let { event ->
                 if (event.isEnabled && event.canRun()) {
-                    handler.post { automation.processEvent(event) }
+                    disposable += Completable.fromAction { automation.processEvent(event) }
+                        .subscribeOn(aapsSchedulers.io)
+                        .subscribe()
                 }
             }
         }

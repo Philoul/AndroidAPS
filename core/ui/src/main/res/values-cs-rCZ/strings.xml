@@ -416,6 +416,9 @@
     <string name="uel_loop_change">SMYČKA ZMĚNĚNA</string>
     <string name="uel_loop_removed">SMYČKA ODEBRÁNA</string>
     <string name="uel_other">JINÉ</string>
+    <string name="uel_running_mode">REŽIM SMYČKY</string>
+    <string name="uel_running_mode_removed">REŽIM SMYČKY ODSTRANĚN</string>
+    <string name="uel_running_mode_updarted">REŽIM SMYČKY AKTUALIZOVÁN</string>
     <!-- HardLimits -->
     <string name="profile_low_target">Dolní cíl profilu</string>
     <string name="profile_high_target">Horní cíl profilu</string>
@@ -645,4 +648,6 @@
     <string name="rate_percent_duration">Hodnota: %1$.2f U/h (%2$.2f%%) Trvání: %3$d min</string>
     <string name="percent_rate_duration_formatted"><![CDATA[<b>Hodnota</b>: %1$.2f%% (%2$.2f U/h)<br><b>Trvání</b>: %3$d min<br>]]></string>
     <string name="rate_percent_duration_formatted"><![CDATA[<b>Hodnota</b>: %1$.2f U/h (%2$.2f%%) <br><b>Trvání</b>: %3$d min<br>]]></string>
+    <!--    Playback-->
+    <string name="audio_playback_attribution">"AAPS přehrává zvuk"</string>
 </resources>

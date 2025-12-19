@@ -309,12 +309,12 @@ class MedtrumPlugin @Inject constructor(
         return result
     }
 
-    override val lastDataTime: Long = medtrumPump.lastConnection
+    override val lastDataTime: Long get() = medtrumPump.lastConnection
     override val lastBolusTime: Long? get() = medtrumPump.lastBolusTime
     override val lastBolusAmount: Double? get() = medtrumPump.lastBolusAmount
     override val baseBasalRate: Double get() = medtrumPump.baseBasalRate
     override val reservoirLevel: Double get() = medtrumPump.reservoir
-    override val batteryLevel: Int get() = 0 // We cannot determine battery level (yet)
+    override val batteryLevel: Int? = null // We cannot determine battery level (yet)
 
     @Synchronized
     override fun deliverTreatment(detailedBolusInfo: DetailedBolusInfo): PumpEnactResult {
@@ -328,7 +328,7 @@ class MedtrumPlugin @Inject constructor(
         aapsLogger.debug(LTag.PUMP, "deliverTreatment: Delivering bolus: " + detailedBolusInfo.insulin + "U")
         val connectionOK = medtrumService?.setBolus(detailedBolusInfo) == true
         val result = pumpEnactResultProvider.get()
-        result.success = (connectionOK && abs(detailedBolusInfo.insulin - BolusProgressData.delivered) < pumpDescription.bolusStep) || medtrumPump.bolusErrorReason == rh.gs(R.string.bolus_error_reason_user)
+        result.success = (connectionOK && abs(detailedBolusInfo.insulin - BolusProgressData.delivered) < pumpDescription.bolusStep) || medtrumPump.bolusStopped
         result.bolusDelivered = BolusProgressData.delivered
         if (!result.success) {
             result.comment(medtrumPump.bolusErrorReason ?: rh.gs(R.string.bolus_error_reason_pump_error))
@@ -401,7 +401,7 @@ class MedtrumPlugin @Inject constructor(
 
     override fun manufacturer(): ManufacturerType = ManufacturerType.Medtrum
     override fun model(): PumpType = medtrumPump.pumpType()
-    override fun serialNumber(): String = medtrumPump.pumpSNFromSP.toString(radix = 16)
+    override fun serialNumber(): String = medtrumPump.pumpSNFromSP.toString(radix = 16).uppercase()
     override val pumpDescription: PumpDescription get() = PumpDescription().fillFor(medtrumPump.pumpType())
     override val isFakingTempsByExtendedBoluses: Boolean = false
     override fun loadTDDs(): PumpEnactResult = pumpEnactResultProvider.get() // Note: Can implement this if we implement history fully (no priority)
