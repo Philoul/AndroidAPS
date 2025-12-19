@@ -258,7 +258,7 @@ class EquilManager @Inject constructor(
                 result.success = true
                 result.enacted(true)
                 while (!bolusProfile.stop && percent < 100) {
-                    rxBus.send(EventOverviewBolusProgress(rh, percent / 100.0 * detailedBolusInfo.insulin, id = detailedBolusInfo.id))
+                    rxBus.send(EventOverviewBolusProgress(rh, ch.fromPump(percent / 100.0 * detailedBolusInfo.insulin), id = detailedBolusInfo.id))
                     SystemClock.sleep(sleep.toLong())
                     percent = percent + percent1
                     aapsLogger.debug(LTag.PUMPCOMM, "isCmdStatus===" + percent + "====" + bolusProfile.stop)

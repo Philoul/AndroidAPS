@@ -29,7 +29,7 @@ class DanaRSPacketNotifyDeliveryRateDisplay @Inject constructor(
         danaPump.bolusProgressLastTimeStamp = System.currentTimeMillis()
         BolusProgressData.delivered = deliveredInsulin
         failed = deliveredInsulin < danaPump.bolusingDetailedBolusInfo!!.insulin
-        rxBus.send(EventOverviewBolusProgress(rh, delivered = deliveredInsulin, id = danaPump.bolusingDetailedBolusInfo?.id))
+        rxBus.send(EventOverviewBolusProgress(rh, delivered = ch.fromPump(deliveredInsulin), id = danaPump.bolusingDetailedBolusInfo?.id))
         aapsLogger.debug(LTag.PUMPCOMM, "Delivered insulin so far: $deliveredInsulin")
     }
 

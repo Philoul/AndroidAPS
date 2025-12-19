@@ -288,7 +288,7 @@ class EopatchPumpPlugin @Inject constructor(
             SystemClock.sleep(100)
             if (patchManagerExecutor.patchConnectionState.isConnected) {
                 val delivering = preferenceManager.bolusCurrent.nowBolus.injected.toDouble()
-                rxBus.send(EventOverviewBolusProgress(rh, delivered = delivering, id = detailedBolusInfo.id))
+                rxBus.send(EventOverviewBolusProgress(rh, delivered = ch.fromPump(delivering), id = detailedBolusInfo.id))
             }
         } while (!preferenceManager.bolusCurrent.nowBolus.endTimeSynced && isSuccess)
 

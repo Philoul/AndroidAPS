@@ -19,6 +19,6 @@ class MsgBolusProgress(
         danaPump.bolusProgressLastTimeStamp = System.currentTimeMillis()
         BolusProgressData.delivered = deliveredInsulin
         aapsLogger.debug(LTag.PUMPCOMM, "Delivered insulin so far: $deliveredInsulin")
-        rxBus.send(EventOverviewBolusProgress(rh, delivered = deliveredInsulin, id = danaPump.bolusingDetailedBolusInfo?.id))
+        rxBus.send(EventOverviewBolusProgress(rh, delivered = ch.fromPump(deliveredInsulin), id = danaPump.bolusingDetailedBolusInfo?.id))
     }
 }

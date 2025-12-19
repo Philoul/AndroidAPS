@@ -398,7 +398,7 @@ public class AapsOmnipodErosManager {
         try {
             bolusCommandResult = executeCommand(() -> delegate.bolus(PumpTypeExtensionKt.determineCorrectBolusSize(PumpType.OMNIPOD_EROS, detailedBolusInfo.insulin), beepsEnabled, beepsEnabled,
                     detailedBolusInfo.getBolusType() == BS.Type.SMB ? null :
-                            (estimatedUnitsDelivered, percentage) -> sendEvent(new EventOverviewBolusProgress(rh, estimatedUnitsDelivered, detailedBolusInfo.getId()))));
+                            (estimatedUnitsDelivered, percentage) -> sendEvent(new EventOverviewBolusProgress(rh, ch.fromPump(estimatedUnitsDelivered), detailedBolusInfo.getId()))));
 
             bolusStarted = new Date();
         } catch (Exception ex) {

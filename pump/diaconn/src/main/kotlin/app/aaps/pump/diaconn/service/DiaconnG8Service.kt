@@ -517,7 +517,7 @@ class DiaconnG8Service : DaggerService() {
         if (diaconnG8Pump.isReadyToBolus) {
             while (!diaconnG8Pump.bolusDone) {
                 if (diaconnG8Pump.isPumpVersionGe3_53) {
-                    rxBus.send(EventOverviewBolusProgress(rh, delivered = diaconnG8Pump.bolusingInjAmount, id = detailedBolusInfo.id))
+                    rxBus.send(EventOverviewBolusProgress(rh, delivered = ch.fromPump(diaconnG8Pump.bolusingInjAmount), id = detailedBolusInfo.id))
                 } else {
                     var progressPercent = 0
                     val waitTime = (expectedEnd - System.currentTimeMillis()) / 1000

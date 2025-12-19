@@ -546,12 +546,12 @@ class InsightPlugin @Inject constructor(
                         }
                         if (activeBolus != null) {
                             trials = -1
-                            rxBus.send(EventOverviewBolusProgress(rh, delivered = activeBolus.initialAmount - activeBolus.remainingAmount, id = detailedBolusInfo.id))
+                            rxBus.send(EventOverviewBolusProgress(rh, delivered = ch.fromPump(activeBolus.initialAmount - activeBolus.remainingAmount), id = detailedBolusInfo.id))
                         } else {
                             synchronized(_bolusLock) {
                                 if (bolusCancelled || trials == -1 || trials++ >= 5) {
                                     if (!bolusCancelled) {
-                                        rxBus.send(EventOverviewBolusProgress(rh, delivered = insulin, id = detailedBolusInfo.id))
+                                        rxBus.send(EventOverviewBolusProgress(rh, delivered = ch.fromPump(insulin), id = detailedBolusInfo.id))
                                     }
                                 }
                             }

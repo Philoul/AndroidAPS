@@ -29,7 +29,7 @@ class DanaRSPacketNotifyDeliveryComplete @Inject constructor(
         val deliveredInsulin = byteArrayToInt(getBytes(data, DATA_START, 2)) / 100.0
         BolusProgressData.delivered = deliveredInsulin
         danaPump.bolusDone = true
-        rxBus.send(EventOverviewBolusProgress(rh, delivered = deliveredInsulin, id = danaPump.bolusingDetailedBolusInfo?.id))
+        rxBus.send(EventOverviewBolusProgress(rh, delivered = ch.fromPump(deliveredInsulin), id = danaPump.bolusingDetailedBolusInfo?.id))
         aapsLogger.debug(LTag.PUMPCOMM, "Delivered insulin: $deliveredInsulin")
     }
 

@@ -465,7 +465,7 @@ class MedtrumService : DaggerService(), BLECommCallback {
             } else {
                 val currentBolusAmount = BolusProgressData.delivered
                 if (currentBolusAmount != lastSentBolusAmount) {
-                    rxBus.send(EventOverviewBolusProgress(rh, BolusProgressData.delivered))
+                    rxBus.send(EventOverviewBolusProgress(rh, ch.fromPump(BolusProgressData.delivered)))
                     lastSentBolusAmount = currentBolusAmount
                 }
             }
