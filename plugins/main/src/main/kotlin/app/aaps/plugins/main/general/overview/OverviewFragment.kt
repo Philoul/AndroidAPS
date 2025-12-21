@@ -199,7 +199,7 @@ class OverviewFragment : DaggerFragment(), View.OnClickListener, OnLongClickList
         val screenHeight = wm.bounds.height()
         smallWidth = screenWidth <= Constants.SMALL_WIDTH
         smallHeight = screenHeight <= Constants.SMALL_HEIGHT
-        val landscape = screenHeight < screenWidth
+        val landscape = screenHeight < screenWidth && screenWidth > 1080
 
         if (config.AAPSCLIENT1)
             binding.nsclientCard.setBackgroundColor(Color.argb(80, 0xE8, 0xC5, 0x0C))
