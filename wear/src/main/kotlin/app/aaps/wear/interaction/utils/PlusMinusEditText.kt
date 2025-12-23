@@ -251,6 +251,15 @@ class PlusMinusEditText @JvmOverloads constructor(
 
         editText.showSoftInputOnFocus = false
         editText.setTextIsSelectable(false)
+
+        // Prevent editText clicks from propagating to ViewPager
+        editText.isClickable = true
+        editText.isFocusable = false
+        editText.setOnClickListener {
+            // Consume the click event without doing anything
+            // This prevents the ViewPager from receiving the touch event
+        }
+
         binding.minButton.setOnTouchListener(this)
         binding.minButton.setOnKeyListener(this)
         binding.minButton.setOnClickListener(this)
