@@ -36,6 +36,15 @@ object NfcCategories {
                 docAnchorResId = R.string.nfccommands_doc_anchor_loop,
             ),
             NfcUiCategory(
+                labelResId = R.string.nfccommands_cat_system,
+                commands =
+                    listOf(
+                        NfcUiCommand(byLabelResId(R.string.nfccommands_cmd_aapsclient_restart), ArgType.NONE),
+                        NfcUiCommand(byLabelResId(R.string.nfccommands_cmd_restart_aaps), ArgType.NONE),
+                    ),
+                docAnchorResId = R.string.nfccommands_doc_anchor_system,
+            ),
+            NfcUiCategory(
                 labelResId = R.string.nfccommands_cat_pump,
                 commands =
                     listOf(
@@ -83,15 +92,6 @@ object NfcCategories {
                         NfcUiCommand(byLabelResId(R.string.nfccommands_cmd_target_stop), ArgType.NONE),
                     ),
                 docAnchorResId = R.string.nfccommands_doc_anchor_targets,
-            ),
-            NfcUiCategory(
-                labelResId = R.string.nfccommands_cat_system,
-                commands =
-                    listOf(
-                        NfcUiCommand(byLabelResId(R.string.nfccommands_cmd_aapsclient_restart), ArgType.NONE),
-                        NfcUiCommand(byLabelResId(R.string.nfccommands_cmd_restart_aaps), ArgType.NONE),
-                    ),
-                docAnchorResId = R.string.nfccommands_doc_anchor_system,
             ),
         )
     }

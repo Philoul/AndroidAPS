@@ -7,6 +7,34 @@
 
     <application>
         <activity
+            android:name=".general.nfcCommands.NfcControlActivity"
+            android:exported="true"
+            android:theme="@style/Theme.MaterialComponents.Translucent">
+            <intent-filter>
+                <action android:name="android.nfc.action.NDEF_DISCOVERED" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/vnd.app.aaps.command" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".general.nfcCommands.NfcBackgroundDetectorActivity"
+            android:exported="true"
+            android:theme="@style/Theme.MaterialComponents.Translucent">
+            <intent-filter>
+                <action android:name="android.nfc.action.TAG_DISCOVERED" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.nfc.action.TECH_DISCOVERED" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <meta-data
+                android:name="android.nfc.action.TECH_DISCOVERED"
+                android:resource="@xml/nfc_tech_filter" />
+        </activity>
+
+        <activity
             android:name="app.aaps.plugins.sync.wear.activities.CwfInfosActivity"
             android:exported="false"
             android:theme="@style/AppTheme" />

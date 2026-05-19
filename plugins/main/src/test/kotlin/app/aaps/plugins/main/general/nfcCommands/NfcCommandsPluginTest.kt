@@ -58,7 +58,7 @@ class NfcCommandsPluginTest : TestBaseWithProfile() {
                 constraintChecker = constraintsChecker,
                 profileFunction = profileFunction,
                 profileUtil = profileUtil,
-                localProfileManager = localProfileManager,
+                profileRepository = profileRepository,
                 insulin = insulin,
                 activePlugin = activePlugin,
                 commandQueue = commandQueue,
@@ -1042,7 +1042,7 @@ class NfcCommandsPluginTest : TestBaseWithProfile() {
 
     @Test
     fun `executeCommand PROFILE with zero percentage should fail`() {
-        whenever(localProfileManager.profile).thenReturn(mockProfileStore)
+        whenever(profileRepository.profile.value).thenReturn(mockProfileStore)
         whenever(mockProfileStore.getProfileList()).thenReturn(arrayListOf("Default"))
 
         val result = plugin.executeCommand("PROFILE 1 0")
@@ -1052,7 +1052,7 @@ class NfcCommandsPluginTest : TestBaseWithProfile() {
 
     @Test
     fun `executeCommand PROFILE with negative percentage should fail`() {
-        whenever(localProfileManager.profile).thenReturn(mockProfileStore)
+        whenever(profileRepository.profile.value).thenReturn(mockProfileStore)
         whenever(mockProfileStore.getProfileList()).thenReturn(arrayListOf("Default"))
 
         val result = plugin.executeCommand("PROFILE 1 -50")
@@ -1062,7 +1062,7 @@ class NfcCommandsPluginTest : TestBaseWithProfile() {
 
     @Test
     fun `executeCommand PROFILE with extreme percentage should fail`() {
-        whenever(localProfileManager.profile).thenReturn(mockProfileStore)
+        whenever(profileRepository.profile.value).thenReturn(mockProfileStore)
         whenever(mockProfileStore.getProfileList()).thenReturn(arrayListOf("Default"))
 
         val result = plugin.executeCommand("PROFILE 1 9999")
@@ -1072,7 +1072,7 @@ class NfcCommandsPluginTest : TestBaseWithProfile() {
 
     @Test
     fun `executeCommand PROFILE should create profile switch with default percentage`() {
-        whenever(localProfileManager.profile).thenReturn(mockProfileStore)
+        whenever(profileRepository.profile.value).thenReturn(mockProfileStore)
         whenever(mockProfileStore.getProfileList()).thenReturn(arrayListOf("Default"))
         runTest {
             whenever(profileFunction.createProfileSwitch(any(), any(), any(), any(), any(), any(), any(), any(), anyOrNull(), any(), any()))
@@ -1104,7 +1104,7 @@ class NfcCommandsPluginTest : TestBaseWithProfile() {
 
     @Test
     fun `executeCommand PROFILE should fail when profile source is not configured`() {
-        whenever(localProfileManager.profile).thenReturn(null)
+        whenever(profileRepository.profile.value).thenReturn(null)
         whenever(rh.gs(app.aaps.core.ui.R.string.notconfigured)).thenReturn("Not configured")
 
         val result = plugin.executeCommand("PROFILE 1")
@@ -1115,7 +1115,7 @@ class NfcCommandsPluginTest : TestBaseWithProfile() {
 
     @Test
     fun `executeCommand PROFILE should fail when profile switch creation fails`() {
-        whenever(localProfileManager.profile).thenReturn(mockProfileStore)
+        whenever(profileRepository.profile.value).thenReturn(mockProfileStore)
         whenever(mockProfileStore.getProfileList()).thenReturn(arrayListOf("Default"))
         runTest {
             whenever(profileFunction.createProfileSwitch(any(), any(), any(), any(), any(), any(), any(), any(), anyOrNull(), any(), any()))
@@ -1405,7 +1405,7 @@ class NfcCommandsPluginTest : TestBaseWithProfile() {
 
     @Test
     fun `executeCommand PROFILE with zero index should fail`() {
-        whenever(localProfileManager.profile).thenReturn(mockProfileStore)
+        whenever(profileRepository.profile.value).thenReturn(mockProfileStore)
         whenever(mockProfileStore.getProfileList()).thenReturn(arrayListOf("Default"))
 
         val result = plugin.executeCommand("PROFILE 0")
@@ -1418,7 +1418,7 @@ class NfcCommandsPluginTest : TestBaseWithProfile() {
 
     @Test
     fun `executeCommand PROFILE with out-of-bounds index should fail`() {
-        whenever(localProfileManager.profile).thenReturn(mockProfileStore)
+        whenever(profileRepository.profile.value).thenReturn(mockProfileStore)
         whenever(mockProfileStore.getProfileList()).thenReturn(arrayListOf("Default"))
 
         val result = plugin.executeCommand("PROFILE 99")

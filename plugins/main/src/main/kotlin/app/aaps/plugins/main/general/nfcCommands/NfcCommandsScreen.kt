@@ -60,7 +60,7 @@ import java.text.DateFormat
 
 private sealed class NfcRoute {
     object Main : NfcRoute()
-    object Build : NfcRoute()
+    data class Build(val tagUid: String? = null) : NfcRoute()
 }
 
 class NfcCommandsComposeContent(private val plugin: NfcCommandsPlugin) : ComposablePluginContent {
@@ -80,13 +80,15 @@ class NfcCommandsComposeContent(private val plugin: NfcCommandsPlugin) : Composa
                 onNavigateBack = onNavigateBack,
                 onSettings = onSettings,
                 initialTab = initialTab,
-                onBuild = { route = NfcRoute.Build },
+                onBuild = { route = NfcRoute.Build() },
+                onEdit = { route = NfcRoute.Build(it.tagUid) },
             )
             is NfcRoute.Build -> NfcBuildScreen(
                 plugin = plugin,
                 setToolbarConfig = setToolbarConfig,
                 onBack = { initialTab = 0; route = NfcRoute.Main },
                 onTagWritten = { initialTab = 1; route = NfcRoute.Main },
+                initialTagUid = (route as NfcRoute.Build).tagUid,
             )
         }
     }
@@ -101,6 +103,7 @@ private fun NfcCommandsScreen(
     onSettings: (() -> Unit)?,
     initialTab: Int,
     onBuild: () -> Unit,
+    onEdit: (NfcCreatedTag) -> Unit,
 ) {
     val tabTitles = remember { listOf(R.string.nfccommands_tab_log, R.string.nfccommands_tab_my_tags) }
     val pagerState = rememberPagerState(initialPage = initialTab) { tabTitles.size }
@@ -142,7 +145,12 @@ private fun NfcCommandsScreen(
         HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
             when (page) {
                 0 -> NfcLogScreen(nfcTagStore = nfcTagStore)
-                else -> NfcTagsScreen(plugin = plugin, nfcTagStore = nfcTagStore, onBuild = onBuild)
+                else -> NfcTagsScreen(
+                    plugin = plugin,
+                    nfcTagStore = nfcTagStore,
+                    onBuild = onBuild,
+                    onEdit = onEdit,
+                )
             }
         }
     }
@@ -233,7 +241,12 @@ private fun NfcLogEntryCard(entry: NfcLogEntry) {
 }
 
 @Composable
-private fun NfcTagsScreen(plugin: NfcCommandsPlugin, nfcTagStore: NfcTagStore, onBuild: () -> Unit) {
+private fun NfcTagsScreen(
+    plugin: NfcCommandsPlugin,
+    nfcTagStore: NfcTagStore,
+    onBuild: () -> Unit,
+    onEdit: (NfcCreatedTag) -> Unit,
+) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var refreshKey by remember { mutableIntStateOf(0) }
@@ -359,7 +372,7 @@ private fun NfcTagsScreen(plugin: NfcCommandsPlugin, nfcTagStore: NfcTagStore, o
                     NfcTagCard(
                         tag = tag,
                         onExecute = { executeTarget = tag },
-                        onRename = { renameTarget = tag; renameText = tag.name },
+                        onEdit = { onEdit(tag) },
                         onDelete = { deleteTarget = tag },
                     )
                 }
@@ -383,7 +396,7 @@ private fun NfcTagsScreen(plugin: NfcCommandsPlugin, nfcTagStore: NfcTagStore, o
 private fun NfcTagCard(
     tag: NfcCreatedTag,
     onExecute: () -> Unit,
-    onRename: () -> Unit,
+    onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -411,7 +424,7 @@ private fun NfcTagCard(
                 IconButton(onClick = onExecute) {
                     Icon(Icons.Filled.PlayArrow, contentDescription = stringResource(R.string.nfccommands_execute_tag))
                 }
-                IconButton(onClick = onRename) {
+                IconButton(onClick = onEdit) {
                     Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.nfccommands_rename_tag))
                 }
                 IconButton(onClick = onDelete) {

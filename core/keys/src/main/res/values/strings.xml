@@ -99,6 +99,8 @@
     <string name="pref_summary_sms_report_pump_unreachable">Send SMS notification when pump becomes unreachable.</string>
     <string name="pref_title_nfc_allow_remote_commands">Allow commands via NFC</string>
     <string name="pref_title_nfc_foreground_priority">NFC foreground priority</string>
+    <string name="pref_title_nfc_enable_background_detection">NFC background detection</string>
+    <string name="pref_summary_nfc_enable_background_detection">When enabled, AndroidAPS will appear in the Android app chooser for unknown NFC tags while in the background.</string>
 
     <!-- Virtual pump preferences -->
     <string name="pref_title_virtual_pump_status_upload">Upload pump status to NS</string>

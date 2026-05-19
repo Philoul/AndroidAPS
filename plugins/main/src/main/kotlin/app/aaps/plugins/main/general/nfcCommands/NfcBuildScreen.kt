@@ -100,6 +100,7 @@ fun NfcBuildScreen(
     setToolbarConfig: (ToolbarConfig) -> Unit,
     onBack: () -> Unit,
     onTagWritten: () -> Unit = onBack,
+    initialTagUid: String? = null,
 ) {
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
@@ -111,6 +112,17 @@ fun NfcBuildScreen(
     var tagName by remember { mutableStateOf("") }
     var isWritingMode by remember { mutableStateOf(false) }
     var showBlankNameDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(initialTagUid) {
+        if (initialTagUid != null) {
+            val tag = plugin.nfcTagStore.findTagByUid(initialTagUid)
+            if (tag != null) {
+                tagName = tag.name
+                chain.clear()
+                chain.addAll(tag.commands)
+            }
+        }
+    }
 
     var suspendMinutes by remember { mutableIntStateOf(60) }
     var pumpDisconnectMinutes by remember { mutableIntStateOf(30) }
@@ -217,7 +229,8 @@ fun NfcBuildScreen(
         nfcAdapter.enableReaderMode(
             activity,
             callback,
-            NfcAdapter.FLAG_READER_NFC_A or NfcAdapter.FLAG_READER_NFC_B,
+            NfcAdapter.FLAG_READER_NFC_A or NfcAdapter.FLAG_READER_NFC_B or
+                NfcAdapter.FLAG_READER_NFC_V or NfcAdapter.FLAG_READER_NFC_F,
             null,
         )
         onDispose { nfcAdapter.disableReaderMode(activity) }
