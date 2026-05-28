@@ -1,4 +1,4 @@
-package app.aaps.ui.compose.alertDialogs
+package app.aaps.ui.compose.aboutDialog
 
 import android.content.Intent
 import android.os.Build

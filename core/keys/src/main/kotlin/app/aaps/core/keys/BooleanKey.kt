@@ -51,6 +51,7 @@ enum class BooleanKey(
     AlertCarbsRequired("enable_carbs_required_alert_local", true, R.string.pref_title_alert_carbs_required),
     AlertUrgentAsAndroidNotification("raise_urgent_alarms_as_android_notification", true, R.string.pref_title_alert_urgent_as_android_notification),
     AlertIncreaseVolume("gradually_increase_notification_volume", true, R.string.pref_title_alert_increase_volume),
+    AlertOverrideDoNotDisturb("alert_override_dnd", true, R.string.pref_title_alert_override_dnd, R.string.pref_summary_alert_override_dnd, defaultedBySM = true),
 
     BgSourceUploadToNs("dexcomg5_nsupload", true, R.string.pref_title_bg_source_upload_to_ns, defaultedBySM = true, hideParentScreenIfHidden = true),
     BgSourceCreateSensorChange("dexcom_lognssensorchange", true, R.string.pref_title_bg_source_create_sensor_change, R.string.pref_summary_bg_source_create_sensor_change, defaultedBySM = true),
