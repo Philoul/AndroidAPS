@@ -31,8 +31,6 @@ class BolusWizardAction(plugin: NfcCommandsPlugin) : NfcAction(plugin) {
         // Load saved preferences
         val useTrend = plugin.preferences.get(BooleanNonKey.WizardIncludeTrend)
         val useCOB = plugin.preferences.get(BooleanNonKey.WizardIncludeCob)
-        val showNotes = plugin.preferences.get(BooleanKey.OverviewShowNotesInDialogs)
-        val useBolusAdvisor = plugin.preferences.get(BooleanKey.OverviewUseBolusAdvisor)
 
         // Percentage: reset to 100% if last BG is too old
         var percentage = plugin.preferences.get(IntKey.OverviewBolusPercentage)
@@ -58,8 +56,9 @@ class BolusWizardAction(plugin: NfcCommandsPlugin) : NfcAction(plugin) {
         val amount = params.optInt(NfcJsonKeys.AMOUNT, 0)
         val wizard = performCalculation() ?: return null
         plugin.setActionState(params.toString(), wizard)
-
-        val base = plugin.rh.gs(CoreUiR.string.goingtodeliver, wizard.insulinAfterConstraints)
+        var tempLog = if (wizard.calculatedTotalInsulin == 0.0 ) "missing Carbs ${wizard.carbsEquivalent}g\n" else
+            "fromBG ${wizard.insulinFromBG}U fromIOB ${wizard.insulinFromBasalIOB+wizard.insulinFromBolusIOB}U\nfromCorr ${wizard.insulinFromCorrection}U TotalInsulin ${wizard.calculatedTotalInsulin}U\n"
+        val base = tempLog + plugin.rh.gs(CoreUiR.string.goingtodeliver, wizard.insulinAfterConstraints)
         val carbs = plugin.rh.gs(CoreUiR.string.format_carbs, amount)
         return "$base ($carbs)"
     }
