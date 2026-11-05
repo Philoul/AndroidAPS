@@ -57,4 +57,11 @@ object AapsSpacing {
     val chipHeight = 35.dp
     val chipIconSize = 24.dp
     val chipProgressHeight = 3.dp
+
+    // Icon button on a list card with several actions side by side. Smaller than the 48 dp default so
+    // the card text keeps its width
+    val compactIconButtonSize = 36.dp
+
+    // Widest the value column of a food card may be (portion and carbs); a longer unit is cut with "…"
+    val foodValueMaxWidth = 80.dp
 }

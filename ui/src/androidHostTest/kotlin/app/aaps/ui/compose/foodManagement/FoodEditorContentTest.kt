@@ -5,6 +5,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performScrollTo
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -15,7 +16,10 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import app.aaps.core.ui.R as CoreUiR
 
-/** Robolectric composable test for [FoodEditorContent]: renders the editor fields + save/cancel actions. */
+/**
+ * Robolectric composable test for [FoodEditorContent]: renders the editor fields + save/cancel actions.
+ * The editor is taller than the small test screen, so the buttons are scrolled to, as a user would.
+ */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [35])
@@ -51,12 +55,11 @@ class FoodEditorContentTest {
                     onEnergyChange = {},
                     onSave = {},
                     onCancel = {},
-                    onDelete = null,
                     isEditing = false
                 )
             }
         }
-        compose.onNodeWithText(saveLabel).assertIsDisplayed()
-        compose.onNodeWithText(cancelLabel).assertIsDisplayed()
+        compose.onNodeWithText(saveLabel).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText(cancelLabel).performScrollTo().assertIsDisplayed()
     }
 }

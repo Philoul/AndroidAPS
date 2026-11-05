@@ -418,21 +418,26 @@
     <string name="food_book_item" comment="One line of a dish or a meal. %1$s = food name, %2$s = quantity with unit. Example: Bread 80 g">%1$s %2$s</string>
     <string name="food_book_servings" comment="Unit of a dish in a meal: 1 serving is the whole dish. Example: 2 servings">servings</string>
     <string name="food_book_missing">A food or a dish in it does not exist any more. Open it and change it.</string>
-    <string name="food_book_clear_first">Clear the meal first, then open the dish or meal to change it.</string>
-    <string name="food_book_deleted" comment="%1$s = name of the dish or meal">%1$s deleted</string>
     <string name="food_book_saved" comment="%1$s = name of the dish or meal">%1$s saved</string>
     <string name="food_book_loop">A dish cannot contain itself.</string>
     <string name="food_book_save_title">Save as a dish or a meal</string>
     <string name="food_book_kind_dish" comment="Choice in the save dialog: save the foods as one dish">Dish</string>
     <string name="food_book_kind_meal" comment="Choice in the save dialog: save the foods as a standard meal">Standard meal</string>
     <string name="food_book_add_food">Add a food</string>
-    <string name="food_book_no_dishes">No dish yet. Put foods in the meal with the + button, then save the meal as a dish.</string>
+    <string name="food_book_no_dishes">No dish yet. Tap foods to put them in the meal, then save the meal as a dish.</string>
     <string name="food_book_no_meals">No standard meal yet. Put foods and dishes in the meal, then save it as a standard meal.</string>
-    <string name="food_book_no_history">No meal sent to the bolus wizard yet.</string>
+    <string name="food_book_no_history">No meal entered from this screen yet.</string>
     <string name="food_book_unknown_total">Total not known</string>
     <string name="food_book_bolus_link" comment="An eaten meal was matched with a bolus calculation. %1$s = time of the calculation, %2$s = insulin with unit, %3$s = carbs with unit. Example: Bolus wizard at 12:34: 3.20 U for 52 g">Bolus wizard at %1$s: %2$s for %3$s</string>
     <string name="food_book_bolus_link_weak">Found by time and carbs only: the note was changed.</string>
-    <string name="food_book_no_bolus_link">No bolus calculation found. The wizard was maybe cancelled.</string>
-    <string name="food_book_history_note">Only meals sent to the bolus wizard from this screen are listed.</string>
+    <string name="food_book_treatment_gone">The treatment of this meal is not found.</string>
+    <string name="food_book_history_note">Only meals entered from this screen with the bolus wizard or the carbs dialog are listed. A cancelled meal is not listed. To remove a meal, delete its treatment in the treatments history.</string>
+    <string name="food_book_delete_used" comment="Warning before a food or a dish is deleted. %1$s = its name, %2$s = the dishes and meals that use it. Example: Bread is used in Toast, Breakfast. Their total will not be known until you change them.">%1$s is used in %2$s. Their total will not be known until you change them.</string>
+    <string name="food_book_carbs_link" comment="An eaten meal was matched with a carbs entry. %1$s = time of the entry, %2$s = carbs with unit. Example: Carbs at 12:34: 52 g">Carbs at %1$s: %2$s</string>
+    <string name="food_book_name_used" comment="%1$s = name typed for a dish or a meal">%1$s already exists. Use its pencil to change it.</string>
+    <string name="food_book_edit" comment="Button with a pencil icon: change a food, a dish or a meal">Change</string>
+    <string name="food_book_edit_title" comment="Title while a dish or a meal is changed. %1$s = its name. Example: Change Breakfast">Change %1$s</string>
+    <string name="food_book_edit_bar" comment="Bar at the bottom of the screen while a dish or a meal is changed. %1$s = its name, %2$s = total carbs with unit. Example: Changing Breakfast: 64 g">Changing %1$s: %2$s</string>
+    <string name="food_book_edit_hint">Tap a line to change its quantity. Tap a food, a dish or a meal in the lists to add it.</string>
 
 </resources>

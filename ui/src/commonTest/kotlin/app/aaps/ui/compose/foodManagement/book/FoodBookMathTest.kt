@@ -1,6 +1,7 @@
 package app.aaps.ui.compose.foodManagement.book
 
 import app.aaps.core.data.model.BCR
+import app.aaps.core.data.model.CA
 import app.aaps.core.data.model.FD
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -77,8 +78,14 @@ class FoodBookMathTest {
         totalInsulin = 2.5, percentageCorrection = 100, profileName = "", note = note
     )
 
-    private fun eaten(id: String, timestamp: Long, carbs: Int, note: String) =
-        EatenMeal(id = id, timestamp = timestamp, name = null, note = note, wizardCarbs = carbs, items = emptyList())
+    private fun eaten(id: String, timestamp: Long, carbs: Int, note: String, target: MealTarget = MealTarget.WIZARD) =
+        EatenMeal(id = id, timestamp = timestamp, name = null, note = note, wizardCarbs = carbs, items = emptyList(), target = target)
+
+    private fun carbsEntry(id: Long, created: Long, timestamp: Long, amount: Double, note: String?) =
+        CA(id = id, dateCreated = created, timestamp = timestamp, duration = 0, amount = amount, notes = note)
+
+    private fun link(meals: List<EatenMeal>, results: List<BCR>, carbs: List<CA> = emptyList()) =
+        FoodBookMath.linkTreatments(meals, results, carbs, slackMs = 60_000, windowMs = 1_800_000)
 
     @Test
     fun `an eaten meal is linked to the calculation with its note`() {
@@ -87,15 +94,16 @@ class FoodBookMathTest {
             bcr(1, timestamp = 1_060_000, carbs = 56.0, note = "other"),
             bcr(2, timestamp = 1_120_000, carbs = 56.0, note = "Bread 80 g (40 g)"),
         )
-        val link = FoodBookMath.linkBoluses(listOf(meal), results, slackMs = 60_000, windowMs = 1_800_000)["m"]!!
+        val link = link(listOf(meal), results)["m"]!!
         assertEquals(1_120_000, link.timestamp)
         assertTrue(link.sameNote)
+        assertEquals(2L, link.bcr!!.id) // kept to show the calculation detail
     }
 
     @Test
     fun `without the note the same carbs give a weaker link`() {
         val meal = eaten("m", timestamp = 1_000_000, carbs = 56, note = "Bread")
-        val link = FoodBookMath.linkBoluses(listOf(meal), listOf(bcr(1, 1_060_000, 56.0, "changed")), 60_000, 1_800_000)["m"]!!
+        val link = link(listOf(meal), listOf(bcr(1, 1_060_000, 56.0, "changed")))["m"]!!
         assertFalse(link.sameNote)
     }
 
@@ -104,8 +112,35 @@ class FoodBookMathTest {
         val first = eaten("a", timestamp = 1_000_000, carbs = 56, note = "x")
         val second = eaten("b", timestamp = 1_010_000, carbs = 56, note = "x")
         val results = listOf(bcr(1, 1_060_000, 56.0, "x"), bcr(2, 9_000_000, 56.0, "x"), bcr(3, 1_070_000, 30.0, "y"))
-        val links = FoodBookMath.linkBoluses(listOf(first, second), results, 60_000, 1_800_000)
+        val links = link(listOf(first, second), results)
         assertEquals(1_060_000, links["a"]!!.timestamp)
         assertNull(links["b"])
+    }
+
+    @Test
+    fun `a meal sent to the carbs dialog is linked to its carbs entry, even dated in the past`() {
+        val meal = eaten("m", timestamp = 10_000_000, carbs = 40, note = "Bread 80 g (40 g)", target = MealTarget.CARBS)
+        // Created just after the meal was sent, but dated one hour earlier in the dialog.
+        val entry = carbsEntry(7, created = 10_030_000, timestamp = 6_400_000, amount = 40.0, note = "Bread 80 g (40 g)")
+        val found = link(listOf(meal), results = emptyList(), carbs = listOf(entry))["m"]!!
+        assertEquals(6_400_000, found.timestamp)
+        assertNull(found.insulin)
+        assertNull(found.bcr)
+        assertTrue(found.sameNote)
+    }
+
+    @Test
+    fun `each meal looks only at its own kind of treatment`() {
+        val wizardMeal = eaten("w", timestamp = 1_000_000, carbs = 40, note = "x")
+        val carbsMeal = eaten("c", timestamp = 1_000_000, carbs = 40, note = "x", target = MealTarget.CARBS)
+        // A carbs entry never confirms a wizard meal, and a bolus calculation never confirms a carbs meal.
+        assertNull(link(listOf(wizardMeal), results = emptyList(), carbs = listOf(carbsEntry(1, 1_010_000, 1_010_000, 40.0, "x")))["w"])
+        assertNull(link(listOf(carbsMeal), results = listOf(bcr(1, 1_010_000, 40.0, "x")))["c"])
+    }
+
+    @Test
+    fun `a cancelled dialog leaves the meal without a treatment`() {
+        val meal = eaten("m", timestamp = 1_000_000, carbs = 40, note = "x", target = MealTarget.CARBS)
+        assertTrue(link(listOf(meal), results = emptyList(), carbs = emptyList()).isEmpty())
     }
 }

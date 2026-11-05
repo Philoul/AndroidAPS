@@ -67,11 +67,19 @@ class FoodBookRepository(
         book.copy(recipes = (others + recipe).sortedBy { it.name.lowercase() })
     }
 
-    suspend fun deleteRecipe(id: String) = change { book -> book.copy(recipes = book.recipes.filterNot { it.id == id }) }
+    suspend fun deleteRecipes(ids: Set<String>) = change { book -> book.copy(recipes = book.recipes.filterNot { it.id in ids }) }
 
     suspend fun addEatenMeal(meal: EatenMeal) = change { book -> book.copy(eaten = listOf(meal) + book.eaten) }
 
-    suspend fun deleteEatenMeal(id: String) = change { book -> book.copy(eaten = book.eaten.filterNot { it.id == id }) }
+    /**
+     * Ties the meals of [linked] (meal id to the treatment found for it) to their treatment, and
+     * removes the meals of [removed].
+     */
+    suspend fun updateEatenMeals(linked: Map<String, TreatmentLink>, removed: Set<String>) = change { book ->
+        book.copy(eaten = book.eaten.filterNot { it.id in removed }.map { meal ->
+            linked[meal.id]?.let { meal.copy(validatedAt = meal.validatedAt ?: it.timestamp, treatmentId = it.id) } ?: meal
+        })
+    }
 
     private suspend fun change(block: (FoodBook) -> FoodBook) {
         load()

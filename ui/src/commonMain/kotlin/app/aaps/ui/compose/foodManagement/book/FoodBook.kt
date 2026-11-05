@@ -1,6 +1,7 @@
 package app.aaps.ui.compose.foodManagement.book
 
 import app.aaps.core.data.model.BCR
+import app.aaps.core.data.model.CA
 import app.aaps.core.data.model.FD
 import kotlinx.serialization.Serializable
 import kotlin.math.abs
@@ -52,12 +53,31 @@ data class RecipeItem(
     val recipeId: String? = null,
 )
 
+/** Where a meal was sent from the food screen. */
+@Serializable
+enum class MealTarget {
+
+    /** The bolus wizard: it saves a bolus calculation with the note. */
+    WIZARD,
+
+    /** The carbs dialog: it saves a carbs entry with the note. No insulin. */
+    CARBS
+}
+
 /**
- * A meal sent to the bolus wizard, with a copy of every value at that time. Changing a food or a
- * standard meal later does not change what was eaten.
+ * A meal sent to the bolus wizard or to the carbs dialog, with a copy of every value at that time.
+ * Changing a food or a standard meal later does not change what was eaten.
  *
- * @param timestamp when the user opened the wizard with this meal
- * @param note the note given to the wizard. Used to find the bolus calculation that came from it.
+ * The meal is kept "waiting" until the treatment it was sent for is found in the database. A meal
+ * whose treatment never comes (the dialog was cancelled) is removed, so the history only lists
+ * meals that were really entered. Once found, the meal keeps the id of its treatment and follows
+ * it: when that treatment is deleted in the treatments history, the meal is removed too.
+ *
+ * @param timestamp when the user opened the dialog with this meal
+ * @param note the note given to the dialog. Used to find the treatment that came from it.
+ * @param validatedAt time of the treatment found for this meal, or null while it is still waiting
+ * @param treatmentId database id of that treatment: a bolus calculation for [MealTarget.WIZARD], a
+ *   carbs entry for [MealTarget.CARBS]. Null while waiting, and for meals saved by an older POC.
  */
 @Serializable
 data class EatenMeal(
@@ -67,6 +87,9 @@ data class EatenMeal(
     val note: String,
     val wizardCarbs: Int,
     val items: List<EatenItem>,
+    val target: MealTarget = MealTarget.WIZARD,
+    val validatedAt: Long? = null,
+    val treatmentId: Long? = null,
 )
 
 @Serializable
@@ -81,12 +104,15 @@ data class EatenItem(
 )
 
 /**
- * The bolus calculation found for an eaten meal.
+ * The treatment found for an eaten meal.
  *
- * @param sameNote true when the calculation has the meal note. False when only the carbs and the
- *   time match, which is a weaker link.
+ * @param id database id of the bolus calculation or of the carbs entry
+ * @param insulin the insulin of the bolus calculation, or null for a carbs entry
+ * @param bcr the bolus calculation, to show its detail. Null for a carbs entry.
+ * @param sameNote true when the treatment has the meal note. False when only the carbs and the time
+ *   match, which is a weaker link.
  */
-data class BolusLink(val timestamp: Long, val insulin: Double, val carbs: Double, val sameNote: Boolean)
+data class TreatmentLink(val id: Long, val timestamp: Long, val insulin: Double?, val carbs: Double, val sameNote: Boolean, val bcr: BCR? = null)
 
 /** Nutrition of a quantity. A value is null when one of the foods does not have it. */
 data class Nutrition(
@@ -151,22 +177,48 @@ internal object FoodBookMath {
     }
 
     /**
-     * Finds, for each eaten meal, the bolus calculation the wizard saved for it: one made between
-     * [slackMs] before and [windowMs] after the meal was sent, with the same note, or else with the
-     * same carbs. Each calculation is given to one meal only, the oldest meal first.
+     * Finds, for each eaten meal, the treatment saved for it: a bolus calculation for a meal sent to
+     * the wizard, a carbs entry for a meal sent to the carbs dialog. The treatment must be made
+     * between [slackMs] before and [windowMs] after the meal was sent, with the same note, or else
+     * with the same carbs. Each treatment is given to one meal only, the oldest meal first.
+     *
+     * A carbs entry is placed at the time chosen in the dialog, which can be in the past or the
+     * future, so for those the time it was created is used when it is known.
      */
-    fun linkBoluses(meals: List<EatenMeal>, results: List<BCR>, slackMs: Long, windowMs: Long): Map<String, BolusLink> {
-        val used = mutableSetOf<Long>()
-        val links = mutableMapOf<String, BolusLink>()
+    fun linkTreatments(meals: List<EatenMeal>, results: List<BCR>, carbs: List<CA>, slackMs: Long, windowMs: Long): Map<String, TreatmentLink> {
+        val usedResults = mutableSetOf<Long>()
+        val usedCarbs = mutableSetOf<Long>()
+        val links = mutableMapOf<String, TreatmentLink>()
         for (meal in meals.sortedBy { it.timestamp }) {
-            val window = results.filter { it.id !in used && it.timestamp in (meal.timestamp - slackMs)..(meal.timestamp + windowMs) }
-            val byNote = window.firstOrNull { it.note == meal.note }
-            val match = byNote ?: window.firstOrNull { abs(it.carbs - meal.wizardCarbs) < 0.5 } ?: continue
-            used += match.id
-            links[meal.id] = BolusLink(timestamp = match.timestamp, insulin = match.totalInsulin, carbs = match.carbs, sameNote = byNote != null)
+            val range = (meal.timestamp - slackMs)..(meal.timestamp + windowMs)
+            when (meal.target) {
+                MealTarget.WIZARD -> {
+                    val window = results.filter { it.id !in usedResults && it.timestamp in range }
+                    val byNote = window.firstOrNull { it.note == meal.note }
+                    val match = byNote ?: window.firstOrNull { abs(it.carbs - meal.wizardCarbs) < 0.5 } ?: continue
+                    usedResults += match.id
+                    links[meal.id] = linkOf(meal, match)
+                }
+
+                MealTarget.CARBS  -> {
+                    val window = carbs.filter { it.id !in usedCarbs && createdAt(it) in range }
+                    val byNote = window.firstOrNull { it.notes == meal.note }
+                    val match = byNote ?: window.firstOrNull { abs(it.amount - meal.wizardCarbs) < 0.5 } ?: continue
+                    usedCarbs += match.id
+                    links[meal.id] = linkOf(meal, match)
+                }
+            }
         }
         return links
     }
+
+    /** The link of [meal] to the bolus calculation made for it. */
+    fun linkOf(meal: EatenMeal, result: BCR) = TreatmentLink(result.id, result.timestamp, result.totalInsulin, result.carbs, sameNote = result.note == meal.note, bcr = result)
+
+    /** The link of [meal] to the carbs entry made for it. */
+    fun linkOf(meal: EatenMeal, carbs: CA) = TreatmentLink(carbs.id, carbs.timestamp, insulin = null, carbs = carbs.amount, sameNote = carbs.notes == meal.note)
+
+    private fun createdAt(carbs: CA): Long = if (carbs.dateCreated > 0) carbs.dateCreated else carbs.timestamp
 
     private fun nutritionOf(recipe: Recipe, foods: Map<Long, FD>, recipes: Map<String, Recipe>, visiting: List<String>): Nutrition? {
         if (recipe.id in visiting || visiting.size >= MAX_DEPTH) return null

@@ -1,6 +1,5 @@
 package app.aaps.ui.compose.foodManagement
 
-import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,7 +14,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -25,12 +23,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AddCircleOutline
 import androidx.compose.material.icons.filled.CloudDownload
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -39,21 +38,24 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigationevent.NavigationEventInfo
+import androidx.navigationevent.compose.NavigationBackHandler
+import androidx.navigationevent.compose.rememberNavigationEventState
+import app.aaps.core.data.model.BCR
 import app.aaps.core.data.model.FD
 import app.aaps.core.interfaces.InterfacesStrings
 import app.aaps.core.ui.CoreUiStrings
@@ -62,10 +64,11 @@ import app.aaps.core.ui.compose.AapsSpacing
 import app.aaps.core.ui.compose.AapsTopAppBar
 import app.aaps.core.ui.compose.LocalSnackbarHostState
 import app.aaps.core.ui.compose.consumeOverscroll
-import app.aaps.core.ui.compose.icons.IcCalculator
 import app.aaps.core.ui.compose.stringResource
 import app.aaps.ui.UiStrings
+import app.aaps.ui.compose.foodManagement.book.MealTarget
 import app.aaps.ui.compose.foodManagement.book.RecipeKind
+import app.aaps.ui.compose.treatments.WizardInfoDialog
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -73,44 +76,54 @@ fun FoodManagementScreen(
     viewModel: FoodManagementViewModel,
     onNavigateBack: () -> Unit,
     onNavigateToWizard: (carbs: Int, name: String) -> Unit = { _, _ -> },
+    onNavigateToCarbs: (carbs: Int, name: String) -> Unit = { _, _ -> },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val filteredFoods by viewModel.filteredFoods.collectAsStateWithLifecycle()
     val filteredSubCategories by viewModel.filteredSubCategories.collectAsStateWithLifecycle()
     val snackbarHostState = LocalSnackbarHostState.current
-    val undoLabel = stringResource(CoreUiStrings.undo)
-    val deletedLabel = stringResource(CoreUiStrings.food_deleted)
 
     // Messages of the dishes and meals POC
     LaunchedEffect(Unit) {
         viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
     }
 
-    // The link to the bolus calculations is looked up when the history is shown, and again when a
-    // meal is added, because the wizard saves its calculation after this screen sent the meal.
-    LaunchedEffect(state.tab, state.eatenMeals) {
-        if (state.tab == FoodTab.HISTORY) viewModel.refreshBolusLinks()
+    // The treatments are looked up again when the history is shown: a meal still waiting for its
+    // treatment is removed there once it is clearly cancelled.
+    LaunchedEffect(state.tab) {
+        if (state.tab == FoodTab.HISTORY) viewModel.refreshTreatmentLinks()
     }
 
-    // Show undo snackbar when a food is deleted
-    LaunchedEffect(state.undoFood) {
-        state.undoFood?.let {
-            val result = snackbarHostState.showSnackbar(
-                message = deletedLabel,
-                actionLabel = undoLabel,
-                duration = SnackbarDuration.Short
-            )
-            if (result == SnackbarResult.ActionPerformed) {
-                viewModel.undoDelete()
-            } else {
-                viewModel.clearUndo()
-            }
-        }
+    // The bolus calculation opened from the history, as in the treatments history.
+    var shownCalculation by remember { mutableStateOf<BCR?>(null) }
+    shownCalculation?.let { WizardInfoDialog(bcr = it, decimalFormatter = viewModel.decimalFormatter, onDismiss = { shownCalculation = null }) }
+
+    fun go(target: MealTarget, result: Pair<Int, String>?) {
+        val (carbs, note) = result ?: return
+        if (target == MealTarget.WIZARD) onNavigateToWizard(carbs, note) else onNavigateToCarbs(carbs, note)
+    }
+
+    val editing = state.editing != null
+    val selecting = state.selecting
+
+    // Back ends the selection first, as the close button of the top bar does.
+    NavigationBackHandler(
+        state = rememberNavigationEventState(NavigationEventInfo.None),
+        isBackEnabled = selecting,
+        onBackCompleted = { viewModel.exitSelection() }
+    )
+
+    if (state.showDeleteConfirm) {
+        DeleteDialog(summary = viewModel.deleteSummary(), onConfirm = viewModel::confirmDelete, onDismiss = viewModel::dismissDelete)
     }
 
     Scaffold(
         topBar = {
-            AapsTopAppBar(
+            // While cards are selected: the bar of the treatments history, with close and delete.
+            if (selecting) {
+                val bar = viewModel.selectionToolbar(onNavigateBack)
+                AapsTopAppBar(title = { Text(bar.title) }, navigationIcon = bar.navigationIcon, actions = bar.actions)
+            } else AapsTopAppBar(
                 title = {
                     AapsSearchField(
                         query = state.searchQuery,
@@ -130,10 +143,10 @@ fun FoodManagementScreen(
             )
         },
         bottomBar = {
-            if (state.mealItems.isNotEmpty()) MealBar(items = state.mealItems, onClick = { viewModel.openMeal() })
+            if (state.mealItems.isNotEmpty() || editing) MealBar(items = state.mealItems, editingName = state.editing?.name, onClick = { viewModel.openMeal() })
         },
         floatingActionButton = {
-            if (state.tab == FoodTab.FOODS) {
+            if (state.tab == FoodTab.FOODS && !selecting) {
                 FloatingActionButton(onClick = { viewModel.openEditor() }) {
                     Icon(Icons.Filled.Add, contentDescription = stringResource(CoreUiStrings.add))
                 }
@@ -154,21 +167,26 @@ fun FoodManagementScreen(
                     RecipeList(
                         recipes = state.recipes,
                         kind = kind,
+                        editing = editing,
+                        selecting = selecting,
+                        selectedIds = state.selectedRecipeIds,
                         nutritionOf = viewModel::nutritionOf,
-                        onOpen = viewModel::editRecipe,
-                        onAddToMeal = { if (kind == RecipeKind.DISH) viewModel.askQuantity(it) else viewModel.addRecipeLines(it) },
-                        onCalculate = { recipe -> viewModel.startWizard(recipe)?.let { (carbs, note) -> onNavigateToWizard(carbs, note) } },
-                        onDelete = viewModel::deleteRecipe,
+                        onAdd = { if (kind == RecipeKind.DISH) viewModel.askQuantity(it) else viewModel.addRecipeLines(it) },
+                        onSelect = viewModel::startSelection,
+                        onToggle = viewModel::toggleSelection,
+                        onEdit = viewModel::startEdit,
+                        onCarbs = { go(MealTarget.CARBS, viewModel.send(it, MealTarget.CARBS)) },
+                        onCalculate = { go(MealTarget.WIZARD, viewModel.send(it, MealTarget.WIZARD)) },
                     )
                     return@Column
                 }
 
                 FoodTab.HISTORY -> {
                     EatenMealList(
-                        meals = state.eatenMeals,
-                        links = state.bolusLinks,
+                        meals = state.confirmedMeals,
+                        links = state.treatmentLinks,
                         timeText = viewModel::timeText,
-                        onDelete = viewModel::deleteEatenMeal,
+                        onShowCalculation = { shownCalculation = it },
                     )
                     return@Column
                 }
@@ -233,9 +251,15 @@ fun FoodManagementScreen(
                     items(filteredFoods, key = { it.id }) { food ->
                         FoodItem(
                             food = food,
+                            editing = editing,
+                            selecting = selecting,
+                            selected = food.id in state.selectedFoodIds,
+                            onAdd = { viewModel.askQuantity(food) },
+                            onSelect = { viewModel.startSelection(food) },
+                            onToggle = { viewModel.toggleSelection(food) },
                             onEdit = { viewModel.openEditor(food) },
-                            onAddToMeal = { viewModel.askQuantity(food) },
-                            onCalculate = { onNavigateToWizard(food.carbs, food.name) }
+                            onCarbs = { go(MealTarget.CARBS, viewModel.send(food, MealTarget.CARBS)) },
+                            onCalculate = { go(MealTarget.WIZARD, viewModel.send(food, MealTarget.WIZARD)) },
                         )
                     }
                 }
@@ -252,6 +276,8 @@ fun FoodManagementScreen(
             ) {
                 FoodEditorContent(
                     state = state,
+                    categories = state.allCategories,
+                    subCategories = viewModel.subCategoriesOf(state.editorCategory),
                     onNameChange = viewModel::updateEditorName,
                     onCategoryChange = viewModel::updateEditorCategory,
                     onSubCategoryChange = viewModel::updateEditorSubCategory,
@@ -264,9 +290,6 @@ fun FoodManagementScreen(
                     onOffPerServingChange = viewModel::setOffPerServing,
                     onSave = { focusManager.clearFocus(); viewModel.saveFood() },
                     onCancel = { focusManager.clearFocus(); viewModel.closeEditor() },
-                    onDelete = if (state.editorFood != null) {
-                        { focusManager.clearFocus(); viewModel.deleteAndCloseEditor() }
-                    } else null,
                     isEditing = state.editorFood != null
                 )
             }
@@ -299,19 +322,32 @@ fun FoodManagementScreen(
                 onDismissRequest = { viewModel.closeMeal() },
                 sheetState = sheetState,
             ) {
-                MealContent(
-                    items = state.mealItems,
-                    sourceName = state.mealSource?.name,
-                    onRemove = viewModel::removeMealItem,
-                    onClear = viewModel::clearMeal,
-                    onAddFood = { viewModel.closeMeal(); viewModel.selectTab(FoodTab.FOODS) },
-                    onSave = viewModel::openSave,
-                    onCalculate = {
-                        val (carbs, note) = viewModel.startWizard()
-                        viewModel.closeMeal()
-                        onNavigateToWizard(carbs, note)
-                    },
-                )
+                val recipe = state.editing
+                if (recipe != null) {
+                    RecipeEditContent(
+                        recipe = recipe,
+                        name = state.editName,
+                        items = state.mealItems,
+                        onNameChange = viewModel::updateEditName,
+                        onEditLine = viewModel::editLine,
+                        onRemove = viewModel::removeMealItem,
+                        onAddFood = { viewModel.closeMeal(); viewModel.selectTab(FoodTab.FOODS) },
+                        onCancel = viewModel::cancelEdit,
+                        onSave = viewModel::saveEdit,
+                    )
+                } else {
+                    MealContent(
+                        items = state.mealItems,
+                        sourceName = state.mealSource?.name,
+                        onEditLine = viewModel::editLine,
+                        onRemove = viewModel::removeMealItem,
+                        onClear = viewModel::clearMeal,
+                        onAddFood = { viewModel.closeMeal(); viewModel.selectTab(FoodTab.FOODS) },
+                        onSave = viewModel::openSave,
+                        onCarbs = { go(MealTarget.CARBS, viewModel.send(MealTarget.CARBS)) },
+                        onCalculate = { go(MealTarget.WIZARD, viewModel.send(MealTarget.WIZARD)) },
+                    )
+                }
             }
         }
 
@@ -336,96 +372,72 @@ fun FoodManagementScreen(
 @Composable
 private fun FoodItem(
     food: FD,
+    editing: Boolean,
+    selecting: Boolean,
+    selected: Boolean,
+    onAdd: () -> Unit,
+    onSelect: () -> Unit,
+    onToggle: () -> Unit,
     onEdit: () -> Unit,
-    onAddToMeal: () -> Unit,
+    onCarbs: () -> Unit,
     onCalculate: () -> Unit,
 ) {
-    ElevatedCard(
-        onClick = onEdit,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = AapsSpacing.extraLarge)
-            .animateContentSize(),
-        colors = CardDefaults.elevatedCardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer
-        )
+    // A tap adds the food to the meal (or to the dish being changed). The pencil changes the food.
+    // A long press selects it, to delete it with the button of the top bar.
+    SelectableCard(
+        selecting = selecting,
+        selected = selected,
+        onClick = if (selecting) onToggle else onAdd,
+        onLongClick = { if (selecting) onToggle() else if (!editing) onSelect() },
+        actions = { if (!editing) CardActions(name = food.name, onEdit = onEdit, onCarbs = onCarbs, onCalculate = onCalculate) },
     ) {
-        Row(
+        val extras = buildList {
+            // F and P were never translated; only the separator and the unit are.
+            val grams = stringResource(CoreUiStrings.units_grams)
+            food.fat?.let { if (it > 0) add(stringResource(InterfacesStrings.confirmation_line, "F", stringResource(CoreUiStrings.value_with_unit, it.toString(), grams))) }
+            food.protein?.let { if (it > 0) add(stringResource(InterfacesStrings.confirmation_line, "P", stringResource(CoreUiStrings.value_with_unit, it.toString(), grams))) }
+            food.energy?.let { if (it > 0) add(stringResource(CoreUiStrings.value_with_unit, it.toString(), "kJ")) }
+        }
+        CardTexts(name = food.name, detail = joinLines(extras))
+        CardValues(
+            portion = if (food.portion > 0) stringResource(CoreUiStrings.value_with_unit, MealMath.formatAmount(food.portion), food.unit) else null,
+            carbs = stringResource(InterfacesStrings.format_carbs, food.carbs),
+        )
+    }
+}
+
+/**
+ * A text field that proposes the values already used, so the same group is not typed twice in two
+ * ways. The list shows the values that contain what is typed. A new text makes a new value.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SuggestionField(value: String, onValueChange: (String) -> Unit, label: String, suggestions: List<String>, modifier: Modifier = Modifier) {
+    var expanded by remember { mutableStateOf(false) }
+    val typed = value.trim()
+    // A value already chosen shows every choice, so another one can be picked without clearing it.
+    // While a new text is typed, only the values that contain it are shown.
+    val filtering = typed.isNotEmpty() && suggestions.none { it.equals(typed, ignoreCase = true) }
+    val shown = if (filtering) suggestions.filter { it.contains(typed, ignoreCase = true) } else suggestions
+    val open = expanded && shown.isNotEmpty()
+    ExposedDropdownMenuBox(expanded = open, onExpandedChange = { expanded = it }, modifier = modifier) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = { onValueChange(it); expanded = true },
+            label = { Text(label) },
+            singleLine = true,
+            // No arrow when there is nothing to propose: the label keeps the whole width.
+            trailingIcon = if (suggestions.isEmpty()) null else { { ExposedDropdownMenuDefaults.TrailingIcon(expanded = open) } },
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = AapsSpacing.extraLarge, top = AapsSpacing.large, bottom = AapsSpacing.large, end = AapsSpacing.small),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = food.name,
-                    style = MaterialTheme.typography.titleSmall
-                )
-                val details = buildString {
-                    if (food.portion > 0) append(stringResource(CoreUiStrings.value_with_unit, MealMath.formatAmount(food.portion), food.unit))
-                    if (food.category != null) {
-                        if (isNotEmpty()) append(" · ")
-                        append(food.category)
-                        if (food.subCategory != null) append(" / ${food.subCategory}")
-                    }
-                }
-                if (details.isNotEmpty()) {
-                    Text(
-                        text = details,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    text = stringResource(InterfacesStrings.format_carbs, food.carbs),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                val extras = buildList {
-                    // F and P were never translated; only the separator and the unit are.
-                    val grams = stringResource(CoreUiStrings.units_grams)
-                    food.fat?.let { if (it > 0) add(stringResource(InterfacesStrings.confirmation_line, "F", stringResource(CoreUiStrings.value_with_unit, it.toString(), grams))) }
-                    food.protein?.let { if (it > 0) add(stringResource(InterfacesStrings.confirmation_line, "P", stringResource(CoreUiStrings.value_with_unit, it.toString(), grams))) }
-                    food.energy?.let { if (it > 0) add(stringResource(CoreUiStrings.value_with_unit, it.toString(), "kJ")) }
-                }
-                if (extras.isNotEmpty()) {
-                    Text(
-                        text = extras.joinToString(" "),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-            // Same naming as the wizard button below: "Bread, Add to meal".
-            IconButton(
-                onClick = onAddToMeal,
-                modifier = Modifier.semantics { contentDescription = food.name }
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.AddCircleOutline,
-                    contentDescription = stringResource(UiStrings.food_meal_add),
-                    modifier = Modifier.size(AapsSpacing.chipIconSize),
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
-            // Name the food, because every row has this same button. Without it a screen reader
-            // says "Bolus wizard" once per row with nothing to tell them apart, and picking the
-            // wrong one opens the calculator already filled with the wrong carbs.
-            //
-            // The food name goes on the IconButton and the verb stays on the Icon: a
-            // contentDescription on a merging node is inserted BEFORE its children rather than
-            // replacing them, so this reads "Chicken salad, Bolus wizard".
-            IconButton(
-                onClick = onCalculate,
-                modifier = Modifier.semantics { contentDescription = food.name }
-            ) {
-                Icon(
-                    imageVector = IcCalculator,
-                    contentDescription = stringResource(CoreUiStrings.boluswizard),
-                    modifier = Modifier.size(AapsSpacing.chipIconSize),
-                    tint = MaterialTheme.colorScheme.primary
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable)
+        )
+        ExposedDropdownMenu(expanded = open, onDismissRequest = { expanded = false }) {
+            shown.forEach { item ->
+                DropdownMenuItem(
+                    text = { Text(item) },
+                    onClick = { onValueChange(item); expanded = false },
+                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
                 )
             }
         }
@@ -435,6 +447,8 @@ private fun FoodItem(
 @Composable
 internal fun FoodEditorContent(
     state: FoodManagementUiState,
+    categories: List<String> = emptyList(),
+    subCategories: List<String> = emptyList(),
     onNameChange: (String) -> Unit,
     onCategoryChange: (String) -> Unit,
     onSubCategoryChange: (String) -> Unit,
@@ -446,7 +460,6 @@ internal fun FoodEditorContent(
     onEnergyChange: (String) -> Unit,
     onSave: () -> Unit,
     onCancel: () -> Unit,
-    onDelete: (() -> Unit)?,
     isEditing: Boolean,
     onOffPerServingChange: (Boolean) -> Unit = {},
 ) {
@@ -479,22 +492,22 @@ internal fun FoodEditorContent(
             isError = state.editorSaveAttempted && state.editorName.isBlank()
         )
 
-        Row(horizontalArrangement = Arrangement.spacedBy(AapsSpacing.large)) {
-            OutlinedTextField(
-                value = state.editorCategory,
-                onValueChange = onCategoryChange,
-                label = { Text(stringResource(CoreUiStrings.category)) },
-                modifier = Modifier.weight(1f),
-                singleLine = true
-            )
-            OutlinedTextField(
-                value = state.editorSubCategory,
-                onValueChange = onSubCategoryChange,
-                label = { Text(stringResource(CoreUiStrings.subcategory)) },
-                modifier = Modifier.weight(1f),
-                singleLine = true
-            )
-        }
+        // One field per row: the list arrow takes width, and a long label must not wrap.
+        // Only the subcategories of the chosen category are proposed.
+        SuggestionField(
+            value = state.editorCategory,
+            onValueChange = onCategoryChange,
+            label = stringResource(CoreUiStrings.category),
+            suggestions = categories,
+            modifier = Modifier.fillMaxWidth()
+        )
+        SuggestionField(
+            value = state.editorSubCategory,
+            onValueChange = onSubCategoryChange,
+            label = stringResource(CoreUiStrings.subcategory),
+            suggestions = subCategories,
+            modifier = Modifier.fillMaxWidth()
+        )
 
         Row(horizontalArrangement = Arrangement.spacedBy(AapsSpacing.large)) {
             OutlinedTextField(
@@ -552,32 +565,21 @@ internal fun FoodEditorContent(
 
         Spacer(Modifier.height(AapsSpacing.medium))
 
+        // Delete is done from the list: long press, then the delete button of the top bar.
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (onDelete != null) {
-                TextButton(onClick = onDelete) {
-                    Text(
-                        stringResource(CoreUiStrings.delete),
-                        color = MaterialTheme.colorScheme.error
-                    )
-                }
-            } else {
-                Spacer(Modifier.width(AapsSpacing.extraSmall))
+            TextButton(onClick = onCancel) {
+                Text(stringResource(CoreUiStrings.cancel))
             }
-            Row {
-                TextButton(onClick = onCancel) {
-                    Text(stringResource(CoreUiStrings.cancel))
-                }
-                Spacer(Modifier.width(AapsSpacing.medium))
-                TextButton(
-                    onClick = onSave,
-                    enabled = !state.editorSaveAttempted || state.editorName.isNotBlank()
-                ) {
-                    Text(stringResource(CoreUiStrings.save))
-                }
+            Spacer(Modifier.width(AapsSpacing.medium))
+            TextButton(
+                onClick = onSave,
+                enabled = !state.editorSaveAttempted || state.editorName.isNotBlank()
+            ) {
+                Text(stringResource(CoreUiStrings.save))
             }
         }
     }

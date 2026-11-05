@@ -74,7 +74,18 @@ sealed class AppRoute(val route: String) {
     }
 
     data object CalibrationDialog : AppRoute("calibration_dialog")
-    data object CarbsDialog : AppRoute("carbs_dialog")
+    data object CarbsDialog : AppRoute("carbs_dialog?carbs={carbs}&notes={notes}") {
+
+        /** [carbs] and [notes] fill the dialog, for example from a meal on the food screen. */
+        fun createRoute(carbs: Int? = null, notes: String? = null): String {
+            val params = buildList {
+                carbs?.let { add("carbs=$it") }
+                notes?.let { add("notes=${WizardDialog.encodeQueryValue(it)}") }
+            }
+            return if (params.isEmpty()) "carbs_dialog"
+            else "carbs_dialog?${params.joinToString("&")}"
+        }
+    }
     data object InsulinDialog : AppRoute("insulin_dialog")
     data object TreatmentDialog : AppRoute("treatment_dialog")
     data object TempBasalDialog : AppRoute("temp_basal_dialog")

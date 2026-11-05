@@ -9,6 +9,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -42,9 +45,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import app.aaps.core.interfaces.InterfacesStrings
+import app.aaps.core.interfaces.navigation.ElementType
 import app.aaps.core.ui.CoreUiStrings
 import app.aaps.core.ui.compose.AapsSpacing
 import app.aaps.core.ui.compose.consumeOverscroll
+import app.aaps.core.ui.compose.navigation.color
+import app.aaps.core.ui.compose.navigation.icon
 import app.aaps.core.ui.compose.stringResource
 import app.aaps.ui.UiStrings
 import app.aaps.ui.compose.foodManagement.openfoodfacts.BarcodeScanner
@@ -228,18 +234,23 @@ private fun OffNotice(text: String, details: String? = null) {
 private fun grams(value: Double): String =
     stringResource(CoreUiStrings.value_with_unit, MealMath.formatAmount(value), stringResource(CoreUiStrings.units_grams))
 
-/** The bar under the food list while a meal is being put together. */
+/**
+ * The bar under the lists while a meal is being put together, or while a dish or a meal is changed
+ * ([editingName]). A tap opens the sheet again.
+ */
 @Composable
-internal fun MealBar(items: List<MealItem>, onClick: () -> Unit) {
+internal fun MealBar(items: List<MealItem>, editingName: String?, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
-        color = MaterialTheme.colorScheme.secondaryContainer,
+        color = if (editingName != null) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.secondaryContainer,
         modifier = Modifier.fillMaxWidth()
     ) {
+        val carbs = stringResource(InterfacesStrings.format_carbs, MealMath.wizardCarbs(items))
         Text(
-            text = stringResource(UiStrings.food_meal_bar, items.size, stringResource(InterfacesStrings.format_carbs, MealMath.wizardCarbs(items))),
+            text = if (editingName != null) stringResource(UiStrings.food_book_edit_bar, editingName, carbs)
+            else stringResource(UiStrings.food_meal_bar, items.size, carbs),
             style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSecondaryContainer,
+            color = if (editingName != null) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onSecondaryContainer,
             modifier = Modifier
                 .navigationBarsPadding()
                 .padding(AapsSpacing.extraLarge)
@@ -247,15 +258,20 @@ internal fun MealBar(items: List<MealItem>, onClick: () -> Unit) {
     }
 }
 
-/** Content of the meal bottom sheet: the foods, the total, and the way to the wizard. */
+/**
+ * Content of the meal bottom sheet: the foods, the total, and the way to the carbs dialog or the
+ * wizard. A tap on a line changes its quantity.
+ */
 @Composable
 internal fun MealContent(
     items: List<MealItem>,
     sourceName: String?,
+    onEditLine: (Long) -> Unit,
     onRemove: (Long) -> Unit,
     onClear: () -> Unit,
     onAddFood: () -> Unit,
     onSave: () -> Unit,
+    onCarbs: () -> Unit,
     onCalculate: () -> Unit,
 ) {
     Column(
@@ -269,22 +285,7 @@ internal fun MealContent(
         verticalArrangement = Arrangement.spacedBy(AapsSpacing.medium)
     ) {
         Text(text = sourceName ?: stringResource(UiStrings.food_meal_title), style = MaterialTheme.typography.titleLarge)
-        items.forEach { item ->
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(text = item.name, style = MaterialTheme.typography.bodyLarge)
-                    Text(
-                        text = stringResource(CoreUiStrings.value_with_unit, MealMath.formatAmount(item.quantity), item.unit),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Text(text = grams(item.carbs), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
-                IconButton(onClick = { onRemove(item.key) }) {
-                    Icon(Icons.Filled.Close, contentDescription = stringResource(CoreUiStrings.remove))
-                }
-            }
-        }
+        items.forEach { item -> MealLine(item, onEdit = { onEditLine(item.key) }, onRemove = { onRemove(item.key) }) }
         HorizontalDivider()
         Text(
             text = stringResource(UiStrings.food_meal_total, grams(MealMath.totalCarbs(items))),
@@ -296,14 +297,30 @@ internal fun MealContent(
             TextButton(onClick = onAddFood) { Text(stringResource(UiStrings.food_book_add_food)) }
             TextButton(onClick = onSave) { Text(stringResource(CoreUiStrings.save)) }
         }
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = onClear) { Text(stringResource(CoreUiStrings.clear)) }
-            TextButton(onClick = onCalculate) { Text(stringResource(CoreUiStrings.boluswizard)) }
+            Row {
+                TreatmentButton(ElementType.CARBS, stringResource(InterfacesStrings.carbs), onCarbs)
+                TreatmentButton(ElementType.BOLUS_WIZARD, stringResource(CoreUiStrings.boluswizard), onCalculate)
+            }
         }
     }
 }
 
-/** Asks how much of one food, or how many servings of one dish, go into the meal. */
+/** A text button with the icon and the colour this action has everywhere in the app. */
+@Composable
+private fun TreatmentButton(type: ElementType, label: String, onClick: () -> Unit) {
+    TextButton(onClick = onClick) {
+        Icon(type.icon(), contentDescription = null, tint = type.color(), modifier = Modifier.size(AapsSpacing.chipIconSize))
+        Spacer(Modifier.width(AapsSpacing.small))
+        Text(label, color = type.color())
+    }
+}
+
+/**
+ * Asks how much of one food, or how many servings of one dish, go into the meal. Opened from a line
+ * of the meal ([FoodManagementUiState.quantityLineKey]), it changes that line instead.
+ */
 @Composable
 internal fun QuantityDialog(
     state: FoodManagementUiState,
@@ -345,7 +362,11 @@ internal fun QuantityDialog(
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onConfirm, enabled = carbs != null) { Text(stringResource(UiStrings.food_meal_add)) } },
+        confirmButton = {
+            TextButton(onClick = onConfirm, enabled = carbs != null) {
+                Text(stringResource(if (state.quantityLineKey != null) CoreUiStrings.ok else UiStrings.food_meal_add))
+            }
+        },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(CoreUiStrings.cancel)) } }
     )
 }
