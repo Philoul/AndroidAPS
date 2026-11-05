@@ -1,0 +1,111 @@
+package app.aaps.ui.compose.foodManagement.book
+
+import app.aaps.core.data.model.BCR
+import app.aaps.core.data.model.FD
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+
+/** Dishes and meals are computed from their foods. The total goes to the bolus wizard. */
+class FoodBookMathTest {
+
+    private val yogurt = FD(id = 1, name = "Yogurt", portion = 1.0, unit = "pot", carbs = 6, fat = 4, protein = 4, energy = 300)
+    private val sugar = FD(id = 2, name = "Sugar", portion = 1.0, unit = "piece", carbs = 5, fat = 0, protein = 0, energy = 84)
+    private val bread = FD(id = 3, name = "Bread", portion = 100.0, unit = "g", carbs = 50)
+    private val foods = listOf(yogurt, sugar, bread).associateBy { it.id }
+
+    private val sweetYogurt = Recipe(
+        id = "dish", name = "Sweet yogurt", kind = RecipeKind.DISH,
+        items = listOf(RecipeItem("Yogurt", 1.0, "pot", foodId = 1), RecipeItem("Sugar", 2.0, "piece", foodId = 2))
+    )
+    private val breakfast = Recipe(
+        id = "meal", name = "Breakfast", kind = RecipeKind.MEAL,
+        items = listOf(RecipeItem("Bread", 80.0, "g", foodId = 3), RecipeItem("Sweet yogurt", 1.0, "servings", recipeId = "dish"))
+    )
+    private val recipes = listOf(sweetYogurt, breakfast).associateBy { it.id }
+
+    @Test
+    fun `a dish is the sum of its foods`() {
+        val n = FoodBookMath.nutritionOf(sweetYogurt, foods, recipes)!!
+        assertEquals(16.0, n.carbs, 0.0001) // 6 + 2 x 5
+        assertEquals(4.0, n.fat!!, 0.0001)
+        assertEquals(468.0, n.energyKj!!, 0.0001)
+    }
+
+    @Test
+    fun `a meal counts the dishes it holds`() {
+        // 80 g of bread is 40 g, plus the sweet yogurt 16 g.
+        assertEquals(56.0, FoodBookMath.nutritionOf(breakfast, foods, recipes)!!.carbs, 0.0001)
+    }
+
+    @Test
+    fun `servings of a dish multiply it`() {
+        val item = RecipeItem("Sweet yogurt", 1.5, "servings", recipeId = "dish")
+        assertEquals(24.0, FoodBookMath.nutritionOf(item, foods, recipes)!!.carbs, 0.0001)
+    }
+
+    @Test
+    fun `a missing value stays unknown instead of counting as zero`() {
+        // Bread has no fat value, so the fat of the breakfast is not known. The carbs still are.
+        val n = FoodBookMath.nutritionOf(breakfast, foods, recipes)!!
+        assertNull(n.fat)
+    }
+
+    @Test
+    fun `a deleted food makes the total unknown, never wrong`() {
+        assertNull(FoodBookMath.nutritionOf(breakfast, foods - 3L, recipes))
+        assertNull(FoodBookMath.nutritionOf(breakfast, foods, recipes - "dish"))
+    }
+
+    @Test
+    fun `a loop is found and gives no total`() {
+        val looped = sweetYogurt.copy(items = sweetYogurt.items + RecipeItem("Breakfast", 1.0, "servings", recipeId = "meal"))
+        val withLoop = recipes + ("dish" to looped)
+        assertNull(FoodBookMath.nutritionOf(breakfast, foods, withLoop))
+        assertTrue(FoodBookMath.makesLoop("dish", looped.items, withLoop))
+        assertFalse(FoodBookMath.makesLoop("dish", sweetYogurt.items, recipes))
+    }
+
+    private fun bcr(id: Long, timestamp: Long, carbs: Double, note: String) = BCR(
+        id = id, timestamp = timestamp, targetBGLow = 0.0, targetBGHigh = 0.0, isf = 0.0, ic = 0.0, bolusIOB = 0.0,
+        wasBolusIOBUsed = false, basalIOB = 0.0, wasBasalIOBUsed = false, glucoseValue = 0.0, wasGlucoseUsed = false,
+        glucoseDifference = 0.0, glucoseInsulin = 0.0, glucoseTrend = 0.0, wasTrendUsed = false, trendInsulin = 0.0,
+        cob = 0.0, wasCOBUsed = false, cobInsulin = 0.0, carbs = carbs, wereCarbsUsed = true, carbsInsulin = 0.0,
+        otherCorrection = 0.0, wasSuperbolusUsed = false, superbolusInsulin = 0.0, wasTempTargetUsed = false,
+        totalInsulin = 2.5, percentageCorrection = 100, profileName = "", note = note
+    )
+
+    private fun eaten(id: String, timestamp: Long, carbs: Int, note: String) =
+        EatenMeal(id = id, timestamp = timestamp, name = null, note = note, wizardCarbs = carbs, items = emptyList())
+
+    @Test
+    fun `an eaten meal is linked to the calculation with its note`() {
+        val meal = eaten("m", timestamp = 1_000_000, carbs = 56, note = "Bread 80 g (40 g)")
+        val results = listOf(
+            bcr(1, timestamp = 1_060_000, carbs = 56.0, note = "other"),
+            bcr(2, timestamp = 1_120_000, carbs = 56.0, note = "Bread 80 g (40 g)"),
+        )
+        val link = FoodBookMath.linkBoluses(listOf(meal), results, slackMs = 60_000, windowMs = 1_800_000)["m"]!!
+        assertEquals(1_120_000, link.timestamp)
+        assertTrue(link.sameNote)
+    }
+
+    @Test
+    fun `without the note the same carbs give a weaker link`() {
+        val meal = eaten("m", timestamp = 1_000_000, carbs = 56, note = "Bread")
+        val link = FoodBookMath.linkBoluses(listOf(meal), listOf(bcr(1, 1_060_000, 56.0, "changed")), 60_000, 1_800_000)["m"]!!
+        assertFalse(link.sameNote)
+    }
+
+    @Test
+    fun `a calculation too late or with other carbs is not linked, and one is used once`() {
+        val first = eaten("a", timestamp = 1_000_000, carbs = 56, note = "x")
+        val second = eaten("b", timestamp = 1_010_000, carbs = 56, note = "x")
+        val results = listOf(bcr(1, 1_060_000, 56.0, "x"), bcr(2, 9_000_000, 56.0, "x"), bcr(3, 1_070_000, 30.0, "y"))
+        val links = FoodBookMath.linkBoluses(listOf(first, second), results, 60_000, 1_800_000)
+        assertEquals(1_060_000, links["a"]!!.timestamp)
+        assertNull(links["b"])
+    }
+}

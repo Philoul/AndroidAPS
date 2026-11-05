@@ -1,0 +1,351 @@
+package app.aaps.ui.compose.foodManagement
+
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import app.aaps.core.interfaces.InterfacesStrings
+import app.aaps.core.ui.CoreUiStrings
+import app.aaps.core.ui.compose.AapsSpacing
+import app.aaps.core.ui.compose.consumeOverscroll
+import app.aaps.core.ui.compose.stringResource
+import app.aaps.ui.UiStrings
+import app.aaps.ui.compose.foodManagement.openfoodfacts.BarcodeScanner
+import app.aaps.ui.compose.foodManagement.openfoodfacts.OffProduct
+import app.aaps.ui.compose.foodManagement.openfoodfacts.OffResult
+import app.aaps.ui.compose.foodManagement.openfoodfacts.barcodeScannerAvailable
+import kotlin.math.roundToInt
+
+// PROOF OF CONCEPT: the Open Food Facts import and the meal. Kept apart from the food screen so the
+// experiment is easy to see, review and throw away.
+
+/** Content of the import bottom sheet: search field, optional camera, results. */
+@Composable
+internal fun OffImportContent(
+    state: FoodManagementUiState,
+    onQueryChange: (String) -> Unit,
+    onSearch: () -> Unit,
+    onOpenScanner: () -> Unit,
+    onCloseScanner: () -> Unit,
+    onScanned: (String) -> Unit,
+    onSelect: (OffProduct) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .imePadding()
+            .consumeOverscroll()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = AapsSpacing.xxLarge)
+            .padding(bottom = AapsSpacing.xxLarge),
+        verticalArrangement = Arrangement.spacedBy(AapsSpacing.large)
+    ) {
+        Text(text = stringResource(UiStrings.food_off_import), style = MaterialTheme.typography.titleLarge)
+        OffNotice(text = stringResource(UiStrings.food_off_warning_short), details = stringResource(UiStrings.food_off_warning))
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(
+                value = state.importQuery,
+                onValueChange = onQueryChange,
+                label = { Text(stringResource(UiStrings.food_off_search_hint)) },
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                // A search is sent on the key or the button only: OFF allows about 10 per minute.
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { onSearch() })
+            )
+            IconButton(onClick = onSearch, enabled = !state.importInProgress && state.importQuery.isNotBlank()) {
+                Icon(Icons.Filled.Search, contentDescription = stringResource(CoreUiStrings.search))
+            }
+            if (barcodeScannerAvailable) {
+                IconButton(onClick = if (state.showScanner) onCloseScanner else onOpenScanner) {
+                    Icon(
+                        imageVector = if (state.showScanner) Icons.Filled.Close else Icons.Filled.QrCodeScanner,
+                        contentDescription = stringResource(UiStrings.food_off_scan)
+                    )
+                }
+            }
+        }
+
+        if (state.showScanner) {
+            BarcodeScanner(
+                onScanned = onScanned,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(4f / 3f)
+            )
+        }
+
+        when (val result = state.importResult) {
+            null                   -> if (state.importInProgress) CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+            OffResult.NotFound     -> Text(stringResource(UiStrings.food_off_not_found))
+            OffResult.Offline      -> Text(stringResource(UiStrings.food_off_offline), color = MaterialTheme.colorScheme.error)
+            OffResult.RateLimited  -> Text(stringResource(UiStrings.food_off_rate_limited), color = MaterialTheme.colorScheme.error)
+            OffResult.Failed       -> Text(stringResource(UiStrings.food_off_failed), color = MaterialTheme.colorScheme.error)
+            is OffResult.Found     -> result.products.forEach { product -> OffProductCard(product = product, onClick = { onSelect(product) }) }
+        }
+
+        Text(
+            text = stringResource(UiStrings.food_off_attribution),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun OffProductCard(product: OffProduct, onClick: () -> Unit) {
+    ElevatedCard(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+    ) {
+        Column(modifier = Modifier.padding(AapsSpacing.large)) {
+            Text(text = product.name, style = MaterialTheme.typography.titleSmall)
+            product.brand?.let {
+                Text(text = it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            val unit = if (product.isLiquid) "ml" else "g"
+            val carbs = product.carbsPer100?.let { grams(it) } ?: stringResource(UiStrings.food_off_unknown)
+            Text(
+                text = stringResource(InterfacesStrings.confirmation_line, stringResource(InterfacesStrings.carbs), stringResource(UiStrings.food_off_carbs_per_100, carbs, unit)),
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (product.carbsPer100 == null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+            )
+            product.servingSize?.let {
+                Text(text = stringResource(UiStrings.food_off_serving, it), style = MaterialTheme.typography.bodySmall)
+            }
+            Text(text = product.barcode, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+/**
+ * Shown at the top of the food editor when it was filled from OFF: the choice between the OFF serving
+ * and 100 g, the exact OFF values, and a short reminder to check them.
+ */
+@Composable
+internal fun OffEditorBanner(product: OffProduct, perServing: Boolean, onPerServingChange: (Boolean) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(AapsSpacing.small)) {
+        val baseUnit = if (product.isLiquid) "ml" else "g"
+        val serving = MealMath.servingPortion(product)
+        if (serving != null) {
+            Row(horizontalArrangement = Arrangement.spacedBy(AapsSpacing.medium)) {
+                FilterChip(
+                    selected = perServing,
+                    onClick = { onPerServingChange(true) },
+                    label = { Text(product.servingSize ?: stringResource(CoreUiStrings.value_with_unit, MealMath.formatAmount(serving.portion), serving.unit)) }
+                )
+                FilterChip(
+                    selected = !perServing,
+                    onClick = { onPerServingChange(false) },
+                    label = { Text(stringResource(CoreUiStrings.value_with_unit, "100", baseUnit)) }
+                )
+            }
+        }
+        Text(stringResource(UiStrings.food_off_values_follow), style = MaterialTheme.typography.bodySmall)
+        val unknown = stringResource(UiStrings.food_off_unknown)
+        Text(
+            text = stringResource(
+                UiStrings.food_off_exact_values,
+                baseUnit,
+                product.carbsPer100?.let { grams(it) } ?: unknown,
+                product.sugarsPer100?.let { grams(it) } ?: unknown,
+                product.fiberPer100?.let { grams(it) } ?: unknown
+            ),
+            style = MaterialTheme.typography.bodySmall
+        )
+        if (product.carbsPer100 == null) {
+            Text(stringResource(UiStrings.food_off_no_carbs), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+        }
+        OffNotice(text = stringResource(UiStrings.food_off_warning_short), details = stringResource(UiStrings.food_off_warning))
+    }
+}
+
+/**
+ * A one-line reminder. With [details], a tap shows the full text. Kept small on purpose: the user
+ * sees it at each step, so a large red card soon gets ignored.
+ */
+@Composable
+private fun OffNotice(text: String, details: String? = null) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (details != null) Modifier.clickable { expanded = !expanded } else Modifier),
+        horizontalArrangement = Arrangement.spacedBy(AapsSpacing.medium),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(Icons.Outlined.Info, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+        Text(
+            text = if (expanded && details != null) details else text,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+/** A weight with one decimal, like "4.7 g". */
+@Composable
+private fun grams(value: Double): String =
+    stringResource(CoreUiStrings.value_with_unit, MealMath.formatAmount(value), stringResource(CoreUiStrings.units_grams))
+
+/** The bar under the food list while a meal is being put together. */
+@Composable
+internal fun MealBar(items: List<MealItem>, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text(
+            text = stringResource(UiStrings.food_meal_bar, items.size, stringResource(InterfacesStrings.format_carbs, MealMath.wizardCarbs(items))),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSecondaryContainer,
+            modifier = Modifier
+                .navigationBarsPadding()
+                .padding(AapsSpacing.extraLarge)
+        )
+    }
+}
+
+/** Content of the meal bottom sheet: the foods, the total, and the way to the wizard. */
+@Composable
+internal fun MealContent(
+    items: List<MealItem>,
+    sourceName: String?,
+    onRemove: (Long) -> Unit,
+    onClear: () -> Unit,
+    onAddFood: () -> Unit,
+    onSave: () -> Unit,
+    onCalculate: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .consumeOverscroll()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = AapsSpacing.xxLarge)
+            .padding(bottom = AapsSpacing.xxLarge),
+        verticalArrangement = Arrangement.spacedBy(AapsSpacing.medium)
+    ) {
+        Text(text = sourceName ?: stringResource(UiStrings.food_meal_title), style = MaterialTheme.typography.titleLarge)
+        items.forEach { item ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = item.name, style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        text = stringResource(CoreUiStrings.value_with_unit, MealMath.formatAmount(item.quantity), item.unit),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Text(text = grams(item.carbs), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                IconButton(onClick = { onRemove(item.key) }) {
+                    Icon(Icons.Filled.Close, contentDescription = stringResource(CoreUiStrings.remove))
+                }
+            }
+        }
+        HorizontalDivider()
+        Text(
+            text = stringResource(UiStrings.food_meal_total, grams(MealMath.totalCarbs(items))),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold
+        )
+        OffNotice(text = stringResource(UiStrings.food_meal_check))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            TextButton(onClick = onAddFood) { Text(stringResource(UiStrings.food_book_add_food)) }
+            TextButton(onClick = onSave) { Text(stringResource(CoreUiStrings.save)) }
+        }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            TextButton(onClick = onClear) { Text(stringResource(CoreUiStrings.clear)) }
+            TextButton(onClick = onCalculate) { Text(stringResource(CoreUiStrings.boluswizard)) }
+        }
+    }
+}
+
+/** Asks how much of one food, or how many servings of one dish, go into the meal. */
+@Composable
+internal fun QuantityDialog(
+    state: FoodManagementUiState,
+    carbsFor: (Double) -> Double?,
+    onQuantityChange: (String) -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val food = state.quantityFood
+    val recipe = state.quantityRecipe
+    val name = food?.name ?: recipe?.name ?: return
+    val unit = when {
+        food == null     -> stringResource(UiStrings.food_book_servings)
+        food.portion > 0 -> food.unit
+        else             -> stringResource(UiStrings.food_meal_portions)
+    }
+    val quantity = MealMath.parseAmount(state.quantityText)
+    val carbs = quantity?.let(carbsFor)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(UiStrings.food_meal_quantity_title, name)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(AapsSpacing.medium)) {
+                OutlinedTextField(
+                    value = state.quantityText,
+                    onValueChange = onQuantityChange,
+                    label = { Text(stringResource(UiStrings.food_meal_quantity, unit)) },
+                    singleLine = true,
+                    isError = quantity == null,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { if (quantity != null) onConfirm() })
+                )
+                if (carbs != null) {
+                    Text(
+                        text = stringResource(InterfacesStrings.format_carbs, carbs.roundToInt()),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onConfirm, enabled = carbs != null) { Text(stringResource(UiStrings.food_meal_add)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(CoreUiStrings.cancel)) } }
+    )
+}

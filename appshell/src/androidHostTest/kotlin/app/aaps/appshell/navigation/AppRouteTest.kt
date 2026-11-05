@@ -140,6 +140,13 @@ class AppRouteTest {
     }
 
     @Test
+    fun wizardDialog_notesWithReservedCharacters_areEncoded() {
+        // A meal note: spaces, brackets, a comma, "&" and an accent must not break the route.
+        assertThat(AppRoute.WizardDialog.createRoute(carbs = 52, notes = "Pain 80 g (40 g), Café & lait"))
+            .isEqualTo("wizard_dialog?carbs=52&notes=Pain%2080%20g%20%2840%20g%29%2C%20Caf%C3%A9%20%26%20lait")
+    }
+
+    @Test
     fun pluginContent_embedsIndex() {
         assertThat(AppRoute.PluginContent.createRoute(7)).isEqualTo("plugin_content/7")
     }

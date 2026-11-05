@@ -25,6 +25,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AddCircleOutline
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
@@ -62,6 +64,8 @@ import app.aaps.core.ui.compose.LocalSnackbarHostState
 import app.aaps.core.ui.compose.consumeOverscroll
 import app.aaps.core.ui.compose.icons.IcCalculator
 import app.aaps.core.ui.compose.stringResource
+import app.aaps.ui.UiStrings
+import app.aaps.ui.compose.foodManagement.book.RecipeKind
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -76,6 +80,17 @@ fun FoodManagementScreen(
     val snackbarHostState = LocalSnackbarHostState.current
     val undoLabel = stringResource(CoreUiStrings.undo)
     val deletedLabel = stringResource(CoreUiStrings.food_deleted)
+
+    // Messages of the dishes and meals POC
+    LaunchedEffect(Unit) {
+        viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
+    }
+
+    // The link to the bolus calculations is looked up when the history is shown, and again when a
+    // meal is added, because the wizard saves its calculation after this screen sent the meal.
+    LaunchedEffect(state.tab, state.eatenMeals) {
+        if (state.tab == FoodTab.HISTORY) viewModel.refreshBolusLinks()
+    }
 
     // Show undo snackbar when a food is deleted
     LaunchedEffect(state.undoFood) {
@@ -106,12 +121,22 @@ fun FoodManagementScreen(
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(CoreUiStrings.back))
                     }
+                },
+                actions = {
+                    IconButton(onClick = { viewModel.openImport() }) {
+                        Icon(Icons.Filled.CloudDownload, contentDescription = stringResource(UiStrings.food_off_import))
+                    }
                 }
             )
         },
+        bottomBar = {
+            if (state.mealItems.isNotEmpty()) MealBar(items = state.mealItems, onClick = { viewModel.openMeal() })
+        },
         floatingActionButton = {
-            FloatingActionButton(onClick = { viewModel.openEditor() }) {
-                Icon(Icons.Filled.Add, contentDescription = stringResource(CoreUiStrings.add))
+            if (state.tab == FoodTab.FOODS) {
+                FloatingActionButton(onClick = { viewModel.openEditor() }) {
+                    Icon(Icons.Filled.Add, contentDescription = stringResource(CoreUiStrings.add))
+                }
             }
         }
     ) { padding ->
@@ -120,6 +145,34 @@ fun FoodManagementScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            FoodTabsRow(selected = state.tab, onSelect = viewModel::selectTab)
+            when (state.tab) {
+                FoodTab.FOODS   -> Unit
+                FoodTab.DISHES,
+                FoodTab.MEALS   -> {
+                    val kind = if (state.tab == FoodTab.DISHES) RecipeKind.DISH else RecipeKind.MEAL
+                    RecipeList(
+                        recipes = state.recipes,
+                        kind = kind,
+                        nutritionOf = viewModel::nutritionOf,
+                        onOpen = viewModel::editRecipe,
+                        onAddToMeal = { if (kind == RecipeKind.DISH) viewModel.askQuantity(it) else viewModel.addRecipeLines(it) },
+                        onCalculate = { recipe -> viewModel.startWizard(recipe)?.let { (carbs, note) -> onNavigateToWizard(carbs, note) } },
+                        onDelete = viewModel::deleteRecipe,
+                    )
+                    return@Column
+                }
+
+                FoodTab.HISTORY -> {
+                    EatenMealList(
+                        meals = state.eatenMeals,
+                        links = state.bolusLinks,
+                        timeText = viewModel::timeText,
+                        onDelete = viewModel::deleteEatenMeal,
+                    )
+                    return@Column
+                }
+            }
             // Filter chips
             if (state.allCategories.isNotEmpty()) {
                 FlowRow(
@@ -181,6 +234,7 @@ fun FoodManagementScreen(
                         FoodItem(
                             food = food,
                             onEdit = { viewModel.openEditor(food) },
+                            onAddToMeal = { viewModel.askQuantity(food) },
                             onCalculate = { onNavigateToWizard(food.carbs, food.name) }
                         )
                     }
@@ -207,6 +261,7 @@ fun FoodManagementScreen(
                     onFatChange = viewModel::updateEditorFat,
                     onProteinChange = viewModel::updateEditorProtein,
                     onEnergyChange = viewModel::updateEditorEnergy,
+                    onOffPerServingChange = viewModel::setOffPerServing,
                     onSave = { focusManager.clearFocus(); viewModel.saveFood() },
                     onCancel = { focusManager.clearFocus(); viewModel.closeEditor() },
                     onDelete = if (state.editorFood != null) {
@@ -216,6 +271,65 @@ fun FoodManagementScreen(
                 )
             }
         }
+
+        // Open Food Facts import (proof of concept)
+        if (state.showImport) {
+            val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+            val focusManager = LocalFocusManager.current
+            ModalBottomSheet(
+                onDismissRequest = { focusManager.clearFocus(); viewModel.closeImport() },
+                sheetState = sheetState,
+            ) {
+                OffImportContent(
+                    state = state,
+                    onQueryChange = viewModel::updateImportQuery,
+                    onSearch = { focusManager.clearFocus(); viewModel.runImport() },
+                    onOpenScanner = { focusManager.clearFocus(); viewModel.openScanner() },
+                    onCloseScanner = viewModel::closeScanner,
+                    onScanned = viewModel::onBarcodeScanned,
+                    onSelect = viewModel::selectOffProduct,
+                )
+            }
+        }
+
+        // Meal (proof of concept)
+        if (state.showMeal) {
+            val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+            ModalBottomSheet(
+                onDismissRequest = { viewModel.closeMeal() },
+                sheetState = sheetState,
+            ) {
+                MealContent(
+                    items = state.mealItems,
+                    sourceName = state.mealSource?.name,
+                    onRemove = viewModel::removeMealItem,
+                    onClear = viewModel::clearMeal,
+                    onAddFood = { viewModel.closeMeal(); viewModel.selectTab(FoodTab.FOODS) },
+                    onSave = viewModel::openSave,
+                    onCalculate = {
+                        val (carbs, note) = viewModel.startWizard()
+                        viewModel.closeMeal()
+                        onNavigateToWizard(carbs, note)
+                    },
+                )
+            }
+        }
+
+        SaveRecipeDialog(
+            state = state,
+            onNameChange = viewModel::updateSaveName,
+            onKindChange = viewModel::updateSaveKind,
+            onConfirm = viewModel::confirmSave,
+            onDismiss = viewModel::dismissSave,
+        )
+
+        QuantityDialog(
+            state = state,
+            carbsFor = viewModel::quantityCarbs,
+            onQuantityChange = viewModel::updateQuantity,
+            onConfirm = viewModel::confirmQuantity,
+            onDismiss = viewModel::dismissQuantity,
+        )
     }
 }
 
@@ -223,6 +337,7 @@ fun FoodManagementScreen(
 private fun FoodItem(
     food: FD,
     onEdit: () -> Unit,
+    onAddToMeal: () -> Unit,
     onCalculate: () -> Unit,
 ) {
     ElevatedCard(
@@ -247,7 +362,7 @@ private fun FoodItem(
                     style = MaterialTheme.typography.titleSmall
                 )
                 val details = buildString {
-                    if (food.portion > 0) append(stringResource(CoreUiStrings.value_with_unit, food.portion.toString(), food.unit))
+                    if (food.portion > 0) append(stringResource(CoreUiStrings.value_with_unit, MealMath.formatAmount(food.portion), food.unit))
                     if (food.category != null) {
                         if (isNotEmpty()) append(" · ")
                         append(food.category)
@@ -282,6 +397,18 @@ private fun FoodItem(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+            }
+            // Same naming as the wizard button below: "Bread, Add to meal".
+            IconButton(
+                onClick = onAddToMeal,
+                modifier = Modifier.semantics { contentDescription = food.name }
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.AddCircleOutline,
+                    contentDescription = stringResource(UiStrings.food_meal_add),
+                    modifier = Modifier.size(AapsSpacing.chipIconSize),
+                    tint = MaterialTheme.colorScheme.primary
+                )
             }
             // Name the food, because every row has this same button. Without it a screen reader
             // says "Bolus wizard" once per row with nothing to tell them apart, and picking the
@@ -321,6 +448,7 @@ internal fun FoodEditorContent(
     onCancel: () -> Unit,
     onDelete: (() -> Unit)?,
     isEditing: Boolean,
+    onOffPerServingChange: (Boolean) -> Unit = {},
 ) {
     Column(
         modifier = Modifier
@@ -337,6 +465,10 @@ internal fun FoodEditorContent(
             text = stringResource(if (isEditing) CoreUiStrings.edit_food else CoreUiStrings.add_food),
             style = MaterialTheme.typography.titleLarge
         )
+
+        state.editorOffProduct?.let {
+            OffEditorBanner(product = it, perServing = state.editorOffPerServing, onPerServingChange = onOffPerServingChange)
+        }
 
         OutlinedTextField(
             value = state.editorName,
