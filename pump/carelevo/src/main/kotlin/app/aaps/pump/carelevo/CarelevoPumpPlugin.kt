@@ -641,6 +641,7 @@ class CarelevoPumpPlugin @Inject constructor(
             // A bolus the app did not record (it stopped during the bolus) is recorded here. The queue reads the status
             // when the app starts ("Pump driver changed"), so this runs seconds after a restart.
             bolusCoordinator.recoverLeftoverBolus(info, serialNumber())
+            tempBasalCoordinator.endTempBasalThePatchDoesNotRun(info, serialNumber())
         } catch (e: Throwable) {
             aapsLogger.error(LTag.PUMPCOMM, "newBle.readInfusionInfo FAILED", e)
         }
@@ -749,7 +750,8 @@ class CarelevoPumpPlugin @Inject constructor(
             onStatusRefreshRequested = {
                 scope?.launch { commandQueue.readStatus("Carelevo bolus completion") }
             },
-            pluginDisposable = pluginDisposable
+            pluginDisposable = pluginDisposable,
+            onAlarmsRefreshRequested = ::refreshActiveAlarmSnapshots
         )
     }
 

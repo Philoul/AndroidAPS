@@ -129,6 +129,7 @@ import app.aaps.implementation.notifications.SnackbarNotificationFallback
 import app.aaps.implementation.plugin.PluginStore
 import app.aaps.implementation.profile.ProfileSwitchScheduler
 import app.aaps.implementation.profile.ProfileSwitchSilentGate
+import app.aaps.implementation.queue.CommandExecutor
 import app.aaps.implementation.resources.ResourceHelperImpl
 import app.aaps.implementation.scenes.ActiveSceneManager
 import app.aaps.implementation.scenes.SceneExecutor
@@ -336,6 +337,7 @@ interface AppRootGraph : MetroViewModelMultibindings {
     val dataInbox: DataInbox
     val autosensData: AutosensData
     val commandQueue: CommandQueue
+    val commandExecutor: CommandExecutor
     val localAlertUtils: LocalAlertUtils
     val periodicMaintenance: PeriodicMaintenance
     val bolusProgressData: BolusProgressData

@@ -50,7 +50,11 @@ class CarelevoPumpState : Serializable {
 
     // ---- Lifecycle --------------------------------------------------------------------------
 
-    var pumpStateRaw: Int = 2
+    /**
+     * A real patch reports 0 after the safety check and while it gives basal or a temp basal, and 1 during a bolus
+     * (seen 2026-11-09). 2 was never seen.
+     */
+    var pumpStateRaw: Int = 0
     var modeRaw: Int = 1
     var subId: Int = 0
     var runningMinutes: Int = 0
@@ -80,6 +84,10 @@ class CarelevoPumpState : Serializable {
     var tempBasalAbsolute: Double? = null
     var tempBasalPercent: Int? = null
     var extendedBolusRunning: Boolean = false
+
+    /** What the running extended bolus was set to: its speed times its time, and its time. */
+    var extendedBolusUnits: Double = 0.0
+    var extendedBolusMinutes: Int = 0
 
     /** actionId of the in-flight immediate bolus; echoed back on 0x84 for correlation. */
     var activeBolusActionId: Int? = null

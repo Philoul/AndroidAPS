@@ -317,13 +317,14 @@ class CarelevoPumpEmulatorTest {
     }
 
     @Test
-    fun `safety check success moves the patch to RUNNING`() {
+    fun `safety check success leaves the pump state READY as a real patch does`() {
         state.pumpStateRaw = CarelevoPumpEmulator.PUMP_STATE_READY
         val cmd = SafetyCheckCommand()
 
-        cmd.decode(emulator.handle(cmd.encode()).last())
+        val decoded = cmd.decode(emulator.handle(cmd.encode()).last())
 
-        assertThat(state.pumpStateRaw).isEqualTo(CarelevoPumpEmulator.PUMP_STATE_RUNNING)
+        assertThat(decoded.resultCode).isEqualTo(CarelevoPumpState.RESULT_SUCCESS)
+        assertThat(state.pumpStateRaw).isEqualTo(CarelevoPumpEmulator.PUMP_STATE_READY)
     }
 
     @Test
@@ -519,7 +520,7 @@ class CarelevoPumpEmulatorTest {
         state.insulinRemaining = 187.65
         state.infusedTotalBasal = 12.34
         state.infusedTotalBolus = 5.5
-        state.pumpStateRaw = CarelevoPumpEmulator.PUMP_STATE_RUNNING
+        state.pumpStateRaw = 2 // not 0, so the test sees where the byte goes
         state.modeRaw = CarelevoPumpEmulator.MODE_BASAL
         val cmd = InfusionInfoCommand()
 
@@ -861,6 +862,9 @@ class CarelevoPumpEmulatorTest {
         assertThat(decoded.expectedTimeSeconds).isEqualTo(5400)
         assertThat(state.extendedBolusRunning).isTrue()
         assertThat(state.modeRaw).isEqualTo(CarelevoPumpEmulator.MODE_EXTEND_BOLUS)
+        // 0.5 U/h for 90 minutes: what the scenario compares with the AAPS record.
+        assertThat(state.extendedBolusMinutes).isEqualTo(90)
+        assertThat(state.extendedBolusUnits).isWithin(1e-9).of(0.75)
     }
 
     @Test
