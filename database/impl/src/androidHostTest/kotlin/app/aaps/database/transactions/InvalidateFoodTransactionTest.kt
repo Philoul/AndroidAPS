@@ -80,7 +80,7 @@ class InvalidateFoodTransactionTest {
         category = "Test",
         subCategory = "Test",
         portion = 100.0,
-        carbs = 50,
+        carbs = 50.0,
         isValid = isValid,
         interfaceIDs_backing = InterfaceIDs()
     ).also { it.id = id }

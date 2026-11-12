@@ -1017,7 +1017,7 @@ class NsIncomingDataProcessorTest : TestBaseWithProfile() {
 
         processor.processFood(foodList)
         verify(storeDataForDb).addToFoods(argThat {
-            this.size == 1 && this[0].carbs == 30 && this[0].name == "sandwich"
+            this.size == 1 && this[0].carbs == 30.0 && this[0].name == "sandwich"
         })
     }
 

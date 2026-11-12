@@ -181,7 +181,7 @@ fun FoodManagementScreen(
                         FoodItem(
                             food = food,
                             onEdit = { viewModel.openEditor(food) },
-                            onCalculate = { onNavigateToWizard(food.carbs, food.name) }
+                            onCalculate = { onNavigateToWizard(FoodValues.wizardCarbs(food.carbs), food.name) }
                         )
                     }
                 }
@@ -207,6 +207,7 @@ fun FoodManagementScreen(
                     onFatChange = viewModel::updateEditorFat,
                     onProteinChange = viewModel::updateEditorProtein,
                     onEnergyChange = viewModel::updateEditorEnergy,
+                    onNoteChange = viewModel::updateEditorNote,
                     onSave = { focusManager.clearFocus(); viewModel.saveFood() },
                     onCancel = { focusManager.clearFocus(); viewModel.closeEditor() },
                     onDelete = if (state.editorFood != null) {
@@ -264,16 +265,16 @@ private fun FoodItem(
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    text = stringResource(InterfacesStrings.format_carbs, food.carbs),
+                    text = stringResource(CoreUiStrings.value_with_unit, FoodValues.format(food.carbs), stringResource(CoreUiStrings.units_grams)),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary
                 )
                 val extras = buildList {
                     // F and P were never translated; only the separator and the unit are.
                     val grams = stringResource(CoreUiStrings.units_grams)
-                    food.fat?.let { if (it > 0) add(stringResource(InterfacesStrings.confirmation_line, "F", stringResource(CoreUiStrings.value_with_unit, it.toString(), grams))) }
-                    food.protein?.let { if (it > 0) add(stringResource(InterfacesStrings.confirmation_line, "P", stringResource(CoreUiStrings.value_with_unit, it.toString(), grams))) }
-                    food.energy?.let { if (it > 0) add(stringResource(CoreUiStrings.value_with_unit, it.toString(), "kJ")) }
+                    food.fat?.let { if (it > 0) add(stringResource(InterfacesStrings.confirmation_line, "F", stringResource(CoreUiStrings.value_with_unit, FoodValues.format(it), grams))) }
+                    food.protein?.let { if (it > 0) add(stringResource(InterfacesStrings.confirmation_line, "P", stringResource(CoreUiStrings.value_with_unit, FoodValues.format(it), grams))) }
+                    food.energy?.let { if (it > 0) add(stringResource(CoreUiStrings.value_with_unit, FoodValues.format(it), "kJ")) }
                 }
                 if (extras.isNotEmpty()) {
                     Text(
@@ -317,6 +318,7 @@ internal fun FoodEditorContent(
     onFatChange: (String) -> Unit,
     onProteinChange: (String) -> Unit,
     onEnergyChange: (String) -> Unit,
+    onNoteChange: (String) -> Unit,
     onSave: () -> Unit,
     onCancel: () -> Unit,
     onDelete: (() -> Unit)?,
@@ -388,7 +390,7 @@ internal fun FoodEditorContent(
             label = { Text(stringResource(CoreUiStrings.label_carbs_g)) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
         )
 
         Row(horizontalArrangement = Arrangement.spacedBy(AapsSpacing.large)) {
@@ -398,7 +400,7 @@ internal fun FoodEditorContent(
                 label = { Text(stringResource(CoreUiStrings.label_fat_g)) },
                 modifier = Modifier.weight(1f),
                 singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
             )
             OutlinedTextField(
                 value = state.editorProtein,
@@ -406,7 +408,7 @@ internal fun FoodEditorContent(
                 label = { Text(stringResource(CoreUiStrings.label_protein_g)) },
                 modifier = Modifier.weight(1f),
                 singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
             )
             OutlinedTextField(
                 value = state.editorEnergy,
@@ -414,9 +416,17 @@ internal fun FoodEditorContent(
                 label = { Text(stringResource(CoreUiStrings.label_energy_kj)) },
                 modifier = Modifier.weight(1f),
                 singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
             )
         }
+
+        OutlinedTextField(
+            value = state.editorNote,
+            onValueChange = onNoteChange,
+            label = { Text(stringResource(CoreUiStrings.notes_label)) },
+            modifier = Modifier.fillMaxWidth(),
+            minLines = 2
+        )
 
         Spacer(Modifier.height(AapsSpacing.medium))
 

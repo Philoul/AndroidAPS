@@ -119,10 +119,11 @@ class FoodManagementViewModel(
                     editorSubCategory = food.subCategory ?: "",
                     editorPortion = food.portion.toString(),
                     editorUnit = food.unit,
-                    editorCarbs = food.carbs.toString(),
-                    editorFat = food.fat?.toString() ?: "",
-                    editorProtein = food.protein?.toString() ?: "",
-                    editorEnergy = food.energy?.toString() ?: "",
+                    editorCarbs = FoodValues.format(food.carbs),
+                    editorFat = food.fat?.let { v -> FoodValues.format(v) } ?: "",
+                    editorProtein = food.protein?.let { v -> FoodValues.format(v) } ?: "",
+                    editorEnergy = food.energy?.let { v -> FoodValues.format(v) } ?: "",
+                    editorNote = food.note ?: "",
                     editorSaveAttempted = false,
                     showEditor = true
                 )
@@ -140,6 +141,7 @@ class FoodManagementViewModel(
                     editorFat = "",
                     editorProtein = "",
                     editorEnergy = "",
+                    editorNote = "",
                     editorSaveAttempted = false,
                     showEditor = true
                 )
@@ -160,6 +162,7 @@ class FoodManagementViewModel(
     fun updateEditorFat(v: String) = _uiState.update { it.copy(editorFat = v) }
     fun updateEditorProtein(v: String) = _uiState.update { it.copy(editorProtein = v) }
     fun updateEditorEnergy(v: String) = _uiState.update { it.copy(editorEnergy = v) }
+    fun updateEditorNote(v: String) = _uiState.update { it.copy(editorNote = v) }
 
     fun saveFood() {
         _uiState.update { it.copy(editorSaveAttempted = true) }
@@ -177,12 +180,17 @@ class FoodManagementViewModel(
             name = name,
             category = state.editorCategory.trim().ifBlank { null },
             subCategory = state.editorSubCategory.trim().ifBlank { null },
-            portion = state.editorPortion.toDoubleOrNull() ?: 0.0,
+            portion = FoodValues.parse(state.editorPortion) ?: 0.0,
             unit = state.editorUnit.trim().ifBlank { "g" },
-            carbs = state.editorCarbs.toIntOrNull() ?: 0,
-            fat = state.editorFat.toIntOrNull(),
-            protein = state.editorProtein.toIntOrNull(),
-            energy = state.editorEnergy.toIntOrNull(),
+            carbs = FoodValues.parse(state.editorCarbs) ?: 0.0,
+            fat = FoodValues.parse(state.editorFat),
+            protein = FoodValues.parse(state.editorProtein),
+            energy = FoodValues.parse(state.editorEnergy),
+            note = state.editorNote.trim().ifBlank { null },
+            // Not in the editor: kept as they are, so editing a food does not lose them.
+            barcode = state.editorFood?.barcode,
+            image = state.editorFood?.image,
+            fiber = state.editorFood?.fiber,
         )
 
         viewModelScope.launch {
@@ -257,6 +265,7 @@ data class FoodManagementUiState(
     val editorFat: String = "",
     val editorProtein: String = "",
     val editorEnergy: String = "",
+    val editorNote: String = "",
     val editorSaveAttempted: Boolean = false,
     // Undo
     val undoFood: FD? = null,

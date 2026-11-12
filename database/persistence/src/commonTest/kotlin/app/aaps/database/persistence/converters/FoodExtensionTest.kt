@@ -32,12 +32,16 @@ internal class FoodExtensionTest {
             category = "drinks",
             subCategory = "fruit",
             portion = 250.0,
-            carbs = 12,
-            fat = 4,
-            protein = 5,
-            energy = 600,
+            carbs = 12.5,
+            fat = 4.2,
+            protein = 5.0,
+            energy = 600.0,
             unit = "ml",
-            gi = 40
+            gi = 40,
+            barcode = "3017620422003",
+            image = "food_3017620422003.jpg",
+            note = "home recipe",
+            fiber = 1.4
         )
 
     private fun sampleEntity(): Food =
@@ -60,12 +64,16 @@ internal class FoodExtensionTest {
             category = "fruit",
             subCategory = "green",
             portion = 100.0,
-            carbs = 14,
-            fat = 1,
-            protein = 2,
-            energy = 300,
+            carbs = 14.0,
+            fat = 1.0,
+            protein = 2.0,
+            energy = 300.0,
             unit = "g",
-            gi = 38
+            gi = 38,
+            barcode = "5000112637922",
+            image = "food_3017620422003.jpg",
+            note = "green ones only",
+            fiber = 2.4
         )
 
     @Test
@@ -86,10 +94,10 @@ internal class FoodExtensionTest {
         assertEquals("drinks", back.category)
         assertEquals("fruit", back.subCategory)
         assertEquals(250.0, back.portion)
-        assertEquals(12, back.carbs)
-        assertEquals(4, back.fat)
-        assertEquals(5, back.protein)
-        assertEquals(600, back.energy)
+        assertEquals(12.5, back.carbs)
+        assertEquals(4.2, back.fat)
+        assertEquals(5.0, back.protein)
+        assertEquals(600.0, back.energy)
         assertEquals("ml", back.unit)
         assertEquals(40, back.gi)
 
@@ -119,12 +127,16 @@ internal class FoodExtensionTest {
         assertEquals("fruit", back.category)
         assertEquals("green", back.subCategory)
         assertEquals(100.0, back.portion)
-        assertEquals(14, back.carbs)
-        assertEquals(1, back.fat)
-        assertEquals(2, back.protein)
-        assertEquals(300, back.energy)
+        assertEquals(14.0, back.carbs)
+        assertEquals(1.0, back.fat)
+        assertEquals(2.0, back.protein)
+        assertEquals(300.0, back.energy)
         assertEquals("g", back.unit)
         assertEquals(38, back.gi)
+        assertEquals("5000112637922", back.barcode)
+        assertEquals("food_3017620422003.jpg", back.image)
+        assertEquals("green ones only", back.note)
+        assertEquals(2.4, back.fiber)
 
         assertEquals("eSys", back.interfaceIDs.nightscoutSystemId)
         assertEquals("eId", back.interfaceIDs.nightscoutId)
@@ -141,7 +153,7 @@ internal class FoodExtensionTest {
             id = 5L,
             name = "water",
             portion = 500.0,
-            carbs = 0
+            carbs = 0.0
         )
         val back = original.toDb().fromDb()
 

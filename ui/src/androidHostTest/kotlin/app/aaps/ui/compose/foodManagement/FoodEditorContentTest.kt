@@ -5,6 +5,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performScrollTo
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -49,6 +50,7 @@ class FoodEditorContentTest {
                     onFatChange = {},
                     onProteinChange = {},
                     onEnergyChange = {},
+                    onNoteChange = {},
                     onSave = {},
                     onCancel = {},
                     onDelete = null,
@@ -56,7 +58,8 @@ class FoodEditorContentTest {
                 )
             }
         }
-        compose.onNodeWithText(saveLabel).assertIsDisplayed()
-        compose.onNodeWithText(cancelLabel).assertIsDisplayed()
+        // The editor scrolls: the note field pushes the buttons below the test screen.
+        compose.onNodeWithText(saveLabel).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText(cancelLabel).performScrollTo().assertIsDisplayed()
     }
 }
