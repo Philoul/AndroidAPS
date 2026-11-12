@@ -28,7 +28,7 @@ class SyncNsFoodTransactionTest {
 
     @Test
     fun `inserts new food when nsId not found`() = runTest {
-        val food = createFood(id = 0, nsId = "ns-123", name = "Apple", carbs = 15)
+        val food = createFood(id = 0, nsId = "ns-123", name = "Apple", carbs = 15.0)
 
         whenever(foodDao.findByNSId("ns-123")).thenReturn(null)
 
@@ -46,8 +46,8 @@ class SyncNsFoodTransactionTest {
 
     @Test
     fun `updates food when content changes`() = runTest {
-        val food = createFood(id = 0, nsId = "ns-123", name = "Apple", carbs = 20)
-        val existing = createFood(id = 1, nsId = "ns-123", name = "Apple", carbs = 15)
+        val food = createFood(id = 0, nsId = "ns-123", name = "Apple", carbs = 20.0)
+        val existing = createFood(id = 1, nsId = "ns-123", name = "Apple", carbs = 15.0)
 
         whenever(foodDao.findByNSId("ns-123")).thenReturn(existing)
 
@@ -66,8 +66,8 @@ class SyncNsFoodTransactionTest {
 
     @Test
     fun `invalidates food when valid becomes invalid`() = runTest {
-        val food = createFood(id = 0, nsId = "ns-123", name = "Apple", carbs = 15, isValid = false)
-        val existing = createFood(id = 1, nsId = "ns-123", name = "Apple", carbs = 15, isValid = true)
+        val food = createFood(id = 0, nsId = "ns-123", name = "Apple", carbs = 15.0, isValid = false)
+        val existing = createFood(id = 1, nsId = "ns-123", name = "Apple", carbs = 15.0, isValid = true)
 
         whenever(foodDao.findByNSId("ns-123")).thenReturn(existing)
 
@@ -85,8 +85,8 @@ class SyncNsFoodTransactionTest {
 
     @Test
     fun `does not update when content is same`() = runTest {
-        val food = createFood(id = 0, nsId = "ns-123", name = "Apple", carbs = 15)
-        val existing = createFood(id = 1, nsId = "ns-123", name = "Apple", carbs = 15)
+        val food = createFood(id = 0, nsId = "ns-123", name = "Apple", carbs = 15.0)
+        val existing = createFood(id = 1, nsId = "ns-123", name = "Apple", carbs = 15.0)
 
         whenever(foodDao.findByNSId("ns-123")).thenReturn(existing)
 
@@ -104,8 +104,8 @@ class SyncNsFoodTransactionTest {
 
     @Test
     fun `handles multiple foods`() = runTest {
-        val food1 = createFood(id = 0, nsId = "ns-1", name = "Apple", carbs = 15)
-        val food2 = createFood(id = 0, nsId = "ns-2", name = "Banana", carbs = 25)
+        val food1 = createFood(id = 0, nsId = "ns-1", name = "Apple", carbs = 15.0)
+        val food2 = createFood(id = 0, nsId = "ns-2", name = "Banana", carbs = 25.0)
 
         whenever(foodDao.findByNSId("ns-1")).thenReturn(null)
         whenever(foodDao.findByNSId("ns-2")).thenReturn(null)
@@ -117,11 +117,41 @@ class SyncNsFoodTransactionTest {
         assertThat(result.inserted).hasSize(2)
     }
 
+    @Test
+    fun `a food completed on the phone keeps its local fields when Nightscout sends it again`() = runTest {
+        // Nightscout does not know barcode, photo, note and fiber, so it always sends them empty.
+        val existing = createFood(id = 1, nsId = "ns-123", name = "Apple", carbs = 15.0).apply {
+            barcode = "3017620422003"
+            image = "food_1.jpg"
+            note = "green ones only"
+            fiber = 2.4
+        }
+        whenever(foodDao.findByNSId("ns-123")).thenReturn(existing)
+
+        // The same food: nothing to write.
+        val same = SyncNsFoodTransaction(listOf(createFood(id = 0, nsId = "ns-123", name = "Apple", carbs = 15.0)))
+        same.database = database
+        assertThat(same.run().updated).isEmpty()
+        verify(foodDao, never()).updateExistingEntry(any())
+
+        // Changed in Nightscout: the new values are taken, the local fields stay.
+        val changed = SyncNsFoodTransaction(listOf(createFood(id = 0, nsId = "ns-123", name = "Apple", carbs = 14.5)))
+        changed.database = database
+        changed.run()
+
+        verify(foodDao).updateExistingEntry(existing)
+        assertThat(existing.carbs).isEqualTo(14.5)
+        assertThat(existing.barcode).isEqualTo("3017620422003")
+        assertThat(existing.image).isEqualTo("food_1.jpg")
+        assertThat(existing.note).isEqualTo("green ones only")
+        assertThat(existing.fiber).isEqualTo(2.4)
+    }
+
     private fun createFood(
         id: Long,
         nsId: String,
         name: String,
-        carbs: Int,
+        carbs: Double,
         isValid: Boolean = true
     ): Food = Food(
         name = name,
@@ -129,9 +159,9 @@ class SyncNsFoodTransactionTest {
         subCategory = "Test",
         portion = 100.0,
         carbs = carbs,
-        fat = 0,
-        protein = 0,
-        energy = 0,
+        fat = 0.0,
+        protein = 0.0,
+        energy = 0.0,
         unit = "g",
         gi = null,
         isValid = isValid,

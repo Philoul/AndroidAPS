@@ -7,6 +7,7 @@ import app.aaps.database.entities.TABLE_APS_RESULTS
 import app.aaps.database.entities.TABLE_BOLUSES
 import app.aaps.database.entities.TABLE_CALIBRATION_ENTRIES
 import app.aaps.database.entities.TABLE_EFFECTIVE_PROFILE_SWITCHES
+import app.aaps.database.entities.TABLE_FOODS
 import app.aaps.database.entities.TABLE_GLUCOSE_VALUES
 import app.aaps.database.entities.TABLE_HEART_RATE
 import app.aaps.database.entities.TABLE_PREFERENCE_CHANGES
@@ -378,6 +379,34 @@ private val migration35to36 = object : Migration(35, 36) {
     }
 }
 
+/**
+ * Foods: nutrition values keep their decimals, and four local columns for the Open Food Facts import.
+ *
+ * `carbs`, `fat`, `protein` and `energy` change from INTEGER to REAL. SQLite cannot change the type of a
+ * column, so the table is built again and the rows copied, as in `migration32to33`. A whole number is
+ * kept as it is (12 becomes 12.0), so no value changes.
+ *
+ * New columns, all empty on the old rows: `barcode`, `image`, `note` and `fiber`.
+ */
+private val migration36to37 = object : Migration(36, 37) {
+    override fun migrate(connection: SQLiteConnection) {
+        connection.execSQL("CREATE TABLE IF NOT EXISTS new_foods (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `version` INTEGER NOT NULL, `dateCreated` INTEGER NOT NULL, `isValid` INTEGER NOT NULL, `referenceId` INTEGER, `name` TEXT NOT NULL, `category` TEXT, `subCategory` TEXT, `portion` REAL NOT NULL, `carbs` REAL NOT NULL, `fat` REAL, `protein` REAL, `energy` REAL, `unit` TEXT NOT NULL, `gi` INTEGER, `barcode` TEXT, `image` TEXT, `note` TEXT, `fiber` REAL, `nightscoutSystemId` TEXT, `nightscoutId` TEXT, `pumpType` TEXT, `pumpSerial` TEXT, `temporaryId` INTEGER, `pumpId` INTEGER, `startId` INTEGER, `endId` INTEGER, FOREIGN KEY(`referenceId`) REFERENCES `foods`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )")
+        connection.execSQL(
+            """
+                INSERT INTO new_foods (id, version, dateCreated, isValid, referenceId, name, category, subCategory, portion, carbs, fat, protein, energy, unit, gi, barcode, image, note, fiber, nightscoutSystemId, nightscoutId, pumpType, pumpSerial, temporaryId, pumpId, startId, endId)
+                SELECT id, version, dateCreated, isValid, referenceId, name, category, subCategory, portion, CAST(carbs AS REAL), CAST(fat AS REAL), CAST(protein AS REAL), CAST(energy AS REAL), unit, gi, NULL, NULL, NULL, NULL, nightscoutSystemId, nightscoutId, pumpType, pumpSerial, temporaryId, pumpId, startId, endId
+                FROM `$TABLE_FOODS`
+                """.trimIndent()
+        )
+        connection.execSQL("DROP TABLE `$TABLE_FOODS`")
+        connection.execSQL("ALTER TABLE new_foods RENAME TO `$TABLE_FOODS`")
+        connection.execSQL("CREATE INDEX IF NOT EXISTS `index_foods_nightscoutId` ON `$TABLE_FOODS` (`nightscoutId`)")
+        connection.execSQL("CREATE INDEX IF NOT EXISTS `index_foods_referenceId` ON `$TABLE_FOODS` (`referenceId`)")
+        connection.execSQL("CREATE INDEX IF NOT EXISTS `index_foods_barcode` ON `$TABLE_FOODS` (`barcode`)")
+        dropCustomIndexes(connection)
+    }
+}
+
 /** Every migration, in order. Passed to the Room builder by each platform. */
 internal val databaseMigrations: Array<Migration> = arrayOf(
     migration22to23,
@@ -394,4 +423,5 @@ internal val databaseMigrations: Array<Migration> = arrayOf(
     migration33to34,
     migration34to35,
     migration35to36,
+    migration36to37,
 )

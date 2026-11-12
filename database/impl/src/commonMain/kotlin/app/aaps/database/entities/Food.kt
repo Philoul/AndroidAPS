@@ -17,7 +17,8 @@ import app.aaps.database.entities.interfaces.TraceableDBEntry
     )],
     indices = [
         Index("nightscoutId"),
-        Index("referenceId")
+        Index("referenceId"),
+        Index("barcode")
     ]
 )
 data class Food(
@@ -37,15 +38,25 @@ data class Food(
     // means 250ml of juice has 12g of carbs
 
     var portion: Double, // common portion in "units"
-    var carbs: Int, // in grams
-    var fat: Int? = null, // in grams
-    var protein: Int? = null, // in grams
-    var energy: Int? = null, // in kJ
+    var carbs: Double, // in grams
+    var fat: Double? = null, // in grams
+    var protein: Double? = null, // in grams
+    var energy: Double? = null, // in kJ
     var unit: String = "g",
-    var gi: Int? = null // not used yet
+    var gi: Int? = null, // not used yet
+    // Local only: Nightscout does not know the fields below. See contentEqualsTo.
+    var barcode: String? = null, // barcode of the product, when imported from Open Food Facts
+    var image: String? = null, // picture file name in the app files (Open Food Facts or user photo), null when none
+    var note: String? = null, // free text written by the user
+    var fiber: Double? = null // in grams, as written on the package
 
 ) : TraceableDBEntry {
 
+    /**
+     * Compares the fields that Nightscout knows. The local only fields (`barcode`, `image`, `note`,
+     * `fiber`) are left out on purpose, here and in [copyFrom]: a food that came from Nightscout and was
+     * completed on the phone must keep them when Nightscout sends the same food again.
+     */
     fun contentEqualsTo(other: Food): Boolean {
         if (isValid != other.isValid) return false
         if (portion != other.portion) return false

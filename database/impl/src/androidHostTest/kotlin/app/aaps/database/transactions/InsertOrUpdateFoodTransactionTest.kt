@@ -28,7 +28,7 @@ class InsertOrUpdateFoodTransactionTest {
 
     @Test
     fun `inserts new food when id not found`() = runTest {
-        val food = createFood(id = 1, name = "Apple", carbs = 15)
+        val food = createFood(id = 1, name = "Apple", carbs = 15.0)
 
         whenever(foodDao.findById(1)).thenReturn(null)
 
@@ -46,8 +46,8 @@ class InsertOrUpdateFoodTransactionTest {
 
     @Test
     fun `updates existing food when id found`() = runTest {
-        val food = createFood(id = 1, name = "Apple", carbs = 20)
-        val existing = createFood(id = 1, name = "Apple", carbs = 15)
+        val food = createFood(id = 1, name = "Apple", carbs = 20.0)
+        val existing = createFood(id = 1, name = "Apple", carbs = 15.0)
 
         whenever(foodDao.findById(1)).thenReturn(existing)
 
@@ -65,8 +65,8 @@ class InsertOrUpdateFoodTransactionTest {
 
     @Test
     fun `updates food carbs value`() = runTest {
-        val existing = createFood(id = 1, name = "Banana", carbs = 25)
-        val updated = createFood(id = 1, name = "Banana", carbs = 30)
+        val existing = createFood(id = 1, name = "Banana", carbs = 25.0)
+        val updated = createFood(id = 1, name = "Banana", carbs = 30.0)
 
         whenever(foodDao.findById(1)).thenReturn(existing)
 
@@ -75,12 +75,12 @@ class InsertOrUpdateFoodTransactionTest {
         val result = transaction.run()
 
         assertThat(result.updated).hasSize(1)
-        assertThat(result.updated[0].carbs).isEqualTo(30)
+        assertThat(result.updated[0].carbs).isEqualTo(30.0)
     }
 
     @Test
     fun `inserts invalid food`() = runTest {
-        val food = createFood(id = 1, name = "Test", carbs = 10, isValid = false)
+        val food = createFood(id = 1, name = "Test", carbs = 10.0, isValid = false)
 
         whenever(foodDao.findById(1)).thenReturn(null)
 
@@ -95,7 +95,7 @@ class InsertOrUpdateFoodTransactionTest {
     private fun createFood(
         id: Long,
         name: String,
-        carbs: Int,
+        carbs: Double,
         isValid: Boolean = true
     ): Food = Food(
         name = name,
@@ -103,9 +103,9 @@ class InsertOrUpdateFoodTransactionTest {
         subCategory = "Test",
         portion = 100.0,
         carbs = carbs,
-        fat = 0,
-        protein = 0,
-        energy = 0,
+        fat = 0.0,
+        protein = 0.0,
+        energy = 0.0,
         unit = "g",
         gi = null,
         isValid = isValid,

@@ -10,8 +10,8 @@ import org.junit.jupiter.api.Test
 class FoodExtensionTest : TestBase() {
 
     private fun food(ids: IDs = IDs()) = FD(
-        name = "Apple", portion = 100.0, carbs = 10, category = "Fruit",
-        fat = 1, protein = 2, energy = 200, gi = 30, ids = ids
+        name = "Apple", portion = 100.0, carbs = 10.0, category = "Fruit",
+        fat = 1.0, protein = 2.0, energy = 200.0, gi = 30, ids = ids
     )
 
     @Test
@@ -19,10 +19,10 @@ class FoodExtensionTest : TestBase() {
         val json = food().toJson(isAdd = true)
         assertThat(json.getString("type")).isEqualTo("food")
         assertThat(json.getString("name")).isEqualTo("Apple")
-        assertThat(json.getInt("carbs")).isEqualTo(10)
+        assertThat(json.getDouble("carbs")).isEqualTo(10.0)
         assertThat(json.getDouble("portion")).isEqualTo(100.0)
         assertThat(json.getString("category")).isEqualTo("Fruit")
-        assertThat(json.getInt("fat")).isEqualTo(1)
+        assertThat(json.getDouble("fat")).isEqualTo(1.0)
         assertThat(json.getString("unit")).isEqualTo("g")
     }
 

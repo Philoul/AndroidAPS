@@ -15,15 +15,25 @@ data class FD(
     // means 250ml of juice has 12g of carbs
 
     var portion: Double, // common portion in "units"
-    var carbs: Int, // in grams
-    var fat: Int? = null, // in grams
-    var protein: Int? = null, // in grams
-    var energy: Int? = null, // in kJ
+    var carbs: Double, // in grams
+    var fat: Double? = null, // in grams
+    var protein: Double? = null, // in grams
+    var energy: Double? = null, // in kJ
     var unit: String = "g",
-    var gi: Int? = null // not used yet
+    var gi: Int? = null, // not used yet
+    // Local only: Nightscout does not know the fields below. See contentEqualsTo.
+    var barcode: String? = null, // barcode of the product, when imported from Open Food Facts
+    var image: String? = null, // picture file name in the app files (Open Food Facts or user photo), null when none
+    var note: String? = null, // free text written by the user
+    var fiber: Double? = null // in grams, as written on the package
 
 ) : HasIDs {
 
+    /**
+     * Compares the fields that Nightscout knows. The local only fields (`barcode`, `image`, `note`,
+     * `fiber`) are left out on purpose: Nightscout never sends them, so they must not make a food from
+     * Nightscout look changed.
+     */
     fun contentEqualsTo(other: FD): Boolean {
         if (isValid != other.isValid) return false
         if (portion != other.portion) return false

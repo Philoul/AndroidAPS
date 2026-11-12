@@ -84,7 +84,7 @@ class UpdateNsIdFoodTransactionTest {
         category = "Test",
         subCategory = "Test",
         portion = 100.0,
-        carbs = 50,
+        carbs = 50.0,
         interfaceIDs_backing = InterfaceIDs(nightscoutId = nsId)
     ).also { it.id = id }
 }
