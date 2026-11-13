@@ -27,13 +27,15 @@ internal data class RemoteFood(
     @SerialName("subcategory") val subcategory: String? = null,
     @SerialName("unit") val unit: String? = null,
     @SerialName("portion") val portion: Double = 0.0,
-    // Whole numbers in AAPS, but another client can write a decimal (10.5, 12.0): it is rounded
-    // instead of failing the whole page. See RoundedIntSerializer.
-    @SerialName("carbs") @Serializable(with = RoundedIntSerializer::class) val carbs: Int = 0,
+    // Decimals as on the package (14.8 g). A whole value is still sent as a whole number, so older
+    // AAPS versions can read it. See NsDecimalSerializer.
+    @SerialName("carbs") @Serializable(with = NsDecimalSerializer::class) val carbs: Double = 0.0,
+    // The glycemic index group stays a whole number, but another client can write 2.0: it is
+    // rounded instead of failing the whole page. See RoundedIntSerializer.
     @SerialName("gi") @Serializable(with = RoundedIntSerializer::class) val gi: Int? = null,
-    @SerialName("energy") @Serializable(with = RoundedIntSerializer::class) val energy: Int? = null,
-    @SerialName("protein") @Serializable(with = RoundedIntSerializer::class) val protein: Int? = null,
-    @SerialName("fat") @Serializable(with = RoundedIntSerializer::class) val fat: Int? = null,
+    @SerialName("energy") @Serializable(with = NsDecimalSerializer::class) val energy: Double? = null,
+    @SerialName("protein") @Serializable(with = NsDecimalSerializer::class) val protein: Double? = null,
+    @SerialName("fat") @Serializable(with = NsDecimalSerializer::class) val fat: Double? = null,
     @SerialName("identifier")
     val identifier: String?,       // string Main addressing, required field that identifies document in the collection. The client should not create the identifier, the server automatically assigns it when the document is inserted.
     @SerialName("isValid")

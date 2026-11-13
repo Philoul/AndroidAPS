@@ -144,7 +144,7 @@ class NightscoutApiUrlTest {
      */
     @Test
     fun `food update and delete send nothing`() = runTest {
-        val food = RemoteFood(name = "Apple", portion = 100.0, carbs = 12, identifier = "x", isValid = true, isReadOnly = false)
+        val food = RemoteFood(name = "Apple", portion = 100.0, carbs = 12.0, identifier = "x", isValid = true, isReadOnly = false)
 
         runCatching { api.updateFood(food, identifier = "x") }
         runCatching { api.deleteFood("x") }

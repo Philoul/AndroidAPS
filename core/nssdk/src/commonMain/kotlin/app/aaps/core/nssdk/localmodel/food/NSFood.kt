@@ -23,10 +23,10 @@ data class NSFood(
     // means 250ml of juice has 12g of carbs
 
     var portion: Double, // common portion in "units"
-    var carbs: Int, // in grams
-    var fat: Int? = null, // in grams
-    var protein: Int? = null, // in grams
-    var energy: Int? = null, // in kJ
+    var carbs: Double, // in grams
+    var fat: Double? = null, // in grams
+    var protein: Double? = null, // in grams
+    var energy: Double? = null, // in kJ
     var unit: String = "g",
     var gi: Int? = null // not used yet
 )
