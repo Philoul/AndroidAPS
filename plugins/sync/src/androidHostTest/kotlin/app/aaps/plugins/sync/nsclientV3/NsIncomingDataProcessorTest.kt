@@ -915,7 +915,7 @@ class NsIncomingDataProcessorTest : TestBaseWithProfile() {
                 identifier = "food_id_1",
                 date = foodTime,
                 isValid = true,
-                carbs = 30,
+                carbs = 30.0,
                 name = "sandwich",
                 portion = 1.0,
                 unit = "piece"

@@ -44,7 +44,7 @@ class FoodAndEntryToleranceTest {
         val food = nsSdkJson.decodeFromString(RemoteFood.serializer(), json)
         assertThat(food.type).isEqualTo("quickpick")
         assertThat(food.portion).isEqualTo(0.0)
-        assertThat(food.carbs).isEqualTo(0)
+        assertThat(food.carbs).isEqualTo(0.0)
 
         // and the mapper drops it, exactly as it did under Gson
         assertThat(food.toNSFood()).isNull()
@@ -76,7 +76,7 @@ class FoodAndEntryToleranceTest {
         val json = """{"type":"food","name":"Apple","portion":100.0,"carbs":null,"unit":null}"""
 
         val food = nsSdkJson.decodeFromString(RemoteFood.serializer(), json)
-        assertThat(food.carbs).isEqualTo(0)
+        assertThat(food.carbs).isEqualTo(0.0)
         assertThat(food.name).isEqualTo("Apple")
     }
 
@@ -102,18 +102,18 @@ class FoodAndEntryToleranceTest {
 
     /**
      * Another client (the Nightscout food editor, an app that computes values per portion) can write
-     * decimals. AAPS keeps whole numbers: they are rounded, instead of the decode failing.
+     * decimals, also as text. AAPS keeps them. Only the glycemic index group, a whole number, is rounded.
      */
     @Test
-    fun `decimal food values are rounded`() {
+    fun `decimal food values are kept, the glycemic index group is rounded`() {
         val json = """{"type":"food","name":"Apple","portion":100.0,"carbs":10.5,"fat":12.0,"protein":"0.4","energy":197.6,"gi":40.2,"unit":"g"}"""
 
         val food = nsSdkJson.decodeFromString(RemoteFood.serializer(), json).toNSFood()!!
 
-        assertThat(food.carbs).isEqualTo(11)
-        assertThat(food.fat).isEqualTo(12)
-        assertThat(food.protein).isEqualTo(0)
-        assertThat(food.energy).isEqualTo(198)
+        assertThat(food.carbs).isEqualTo(10.5)
+        assertThat(food.fat).isEqualTo(12.0)
+        assertThat(food.protein).isEqualTo(0.4)
+        assertThat(food.energy).isEqualTo(197.6)
         assertThat(food.gi).isEqualTo(40)
     }
 
@@ -127,7 +127,7 @@ class FoodAndEntryToleranceTest {
 
         val foods = nsSdkJson.decodeFromString(ListSerializer(RemoteFood.serializer()), json).mapNotNull { it.toNSFood() }
 
-        assertThat(foods.map { it.name to it.carbs }).containsExactly("Apple" to 12, "Pear" to 11)
+        assertThat(foods.map { it.name to it.carbs }).containsExactly("Apple" to 12.0, "Pear" to 10.5)
     }
 
     /** Whole numbers, missing and null values read as before, and the upload format does not change. */
@@ -136,7 +136,7 @@ class FoodAndEntryToleranceTest {
         val json = """{"type":"food","name":"Apple","portion":100.0,"carbs":12,"fat":null,"unit":"g"}"""
 
         val food = nsSdkJson.decodeFromString(RemoteFood.serializer(), json)
-        assertThat(food.carbs).isEqualTo(12)
+        assertThat(food.carbs).isEqualTo(12.0)
         assertThat(food.fat).isNull()
         assertThat(food.protein).isNull()
 
