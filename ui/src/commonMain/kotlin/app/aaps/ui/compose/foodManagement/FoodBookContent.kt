@@ -374,9 +374,12 @@ internal fun EatenMealList(
     onShowCalculation: (BCR) -> Unit,
     images: Map<Long, ByteArray> = emptyMap(),
     photos: Map<String, ByteArray> = emptyMap(),
+    onSaveMeal: (EatenMeal) -> Unit = {},
 ) {
     var detail by remember { mutableStateOf<EatenMeal?>(null) }
-    detail?.let { meal -> EatenMealDetail(meal, images, photos, timeText, onDismiss = { detail = null }) }
+    detail?.let { meal ->
+        EatenMealDetail(meal, images, photos, timeText, onSave = { detail = null; onSaveMeal(meal) }, onDismiss = { detail = null })
+    }
     if (meals.isEmpty()) {
         EmptyText(stringResource(UiStrings.food_book_no_history))
         return
@@ -403,8 +406,9 @@ internal fun EatenMealList(
 @Composable
 private fun EatenMealCard(meal: EatenMeal, link: TreatmentLink?, photo: ByteArray?, timeText: (Long) -> String, onShowCalculation: (BCR) -> Unit, onShowDetail: () -> Unit) {
     // A saved dish or meal sent as it is shows its name only, the lines are folded. A meal put
-    // together on the spot, or a saved meal changed before it was sent, shows its lines.
-    val foldable = meal.name != null && !meal.changed
+    // together on the spot, or a saved meal changed before it was sent, shows its lines: also when
+    // it was saved as a dish later, it shows that name with its lines.
+    val foldable = meal.name != null && !meal.changed && !meal.savedLater
     var expanded by rememberSaveable(meal.id) { mutableStateOf(!foldable) }
     ElevatedCard(
         modifier = Modifier
@@ -418,7 +422,10 @@ private fun EatenMealCard(meal: EatenMeal, link: TreatmentLink?, photo: ByteArra
             verticalArrangement = Arrangement.spacedBy(AapsSpacing.small)
         ) {
             val type = if (meal.target == MealTarget.WIZARD) ElementType.BOLUS_WIZARD else ElementType.CARBS
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            // The lines go under the time (and the name), next to the total and its buttons. Put under
+            // the whole top line, they started lower than the name of a saved dish: that line is as
+            // high as its buttons, and the time alone sat in its middle.
+            Row(verticalAlignment = Alignment.Top) {
                 // The photo of the dish or meal sent, as on the other tabs. The photos of the foods are in the detail.
                 if (photo != null) {
                     FoodPhoto(bytes = photo, size = AapsSpacing.foodThumbnailSize)
@@ -427,40 +434,43 @@ private fun EatenMealCard(meal: EatenMeal, link: TreatmentLink?, photo: ByteArra
                 Column(modifier = Modifier.weight(1f)) {
                     Text(text = timeText(meal.timestamp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     meal.name?.let { Text(text = it, style = MaterialTheme.typography.titleSmall) }
-                }
-                if (foldable) IconButton(onClick = { expanded = !expanded }, modifier = Modifier.size(AapsSpacing.compactIconButtonSize)) {
-                    Icon(
-                        imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                        contentDescription = stringResource(if (expanded) UiStrings.food_book_fold else UiStrings.food_book_unfold)
-                    )
-                }
-                Text(
-                    text = stringResource(InterfacesStrings.format_carbs, meal.wizardCarbs),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                // The same button as in the treatments history: it shows how the bolus was computed.
-                // A carbs entry has no detail: its icon only says what was entered, in the same place.
-                val bcr = link?.bcr
-                if (bcr != null)
-                    CardIcon(type.icon(), stringResource(CoreUiStrings.boluswizard), timeText(meal.timestamp), type.color()) { onShowCalculation(bcr) }
-                else
-                    Box(modifier = Modifier.size(AapsSpacing.compactIconButtonSize), contentAlignment = Alignment.Center) {
-                        Icon(type.icon(), contentDescription = null, modifier = Modifier.size(AapsSpacing.chipIconSize), tint = type.color())
+                    if (expanded) meal.items.forEach { item ->
+                        Text(
+                            text = stringResource(
+                                UiStrings.food_meal_note_item,
+                                item.name,
+                                if (item.estimated) stringResource(UiStrings.food_meal_estimated)
+                                else stringResource(CoreUiStrings.value_with_unit, MealMath.formatAmount(item.quantity), item.unit),
+                                stringResource(InterfacesStrings.format_carbs, item.carbs.roundToInt())
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(top = AapsSpacing.small)
+                        )
                     }
-            }
-            if (expanded) meal.items.forEach { item ->
-                Text(
-                    text = stringResource(
-                        UiStrings.food_meal_note_item,
-                        item.name,
-                        if (item.estimated) stringResource(UiStrings.food_meal_estimated)
-                        else stringResource(CoreUiStrings.value_with_unit, MealMath.formatAmount(item.quantity), item.unit),
-                        stringResource(InterfacesStrings.format_carbs, item.carbs.roundToInt())
-                    ),
-                    style = MaterialTheme.typography.bodySmall
-                )
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (foldable) IconButton(onClick = { expanded = !expanded }, modifier = Modifier.size(AapsSpacing.compactIconButtonSize)) {
+                        Icon(
+                            imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                            contentDescription = stringResource(if (expanded) UiStrings.food_book_fold else UiStrings.food_book_unfold)
+                        )
+                    }
+                    Text(
+                        text = stringResource(InterfacesStrings.format_carbs, meal.wizardCarbs),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    // The same button as in the treatments history: it shows how the bolus was computed.
+                    // A carbs entry has no detail: its icon only says what was entered, in the same place.
+                    val bcr = link?.bcr
+                    if (bcr != null)
+                        CardIcon(type.icon(), stringResource(CoreUiStrings.boluswizard), timeText(meal.timestamp), type.color()) { onShowCalculation(bcr) }
+                    else
+                        Box(modifier = Modifier.size(AapsSpacing.compactIconButtonSize), contentAlignment = Alignment.Center) {
+                            Icon(type.icon(), contentDescription = null, modifier = Modifier.size(AapsSpacing.chipIconSize), tint = type.color())
+                        }
+                }
             }
             when {
                 link == null        ->
@@ -492,9 +502,12 @@ private fun EatenMealCard(meal: EatenMeal, link: TreatmentLink?, photo: ByteArra
     }
 }
 
-/** The lines of an eaten meal with the photo of each food, and the total. */
+/**
+ * The lines of an eaten meal with the photo of each food, and the total. [onSave] saves the meal as a
+ * dish or a standard meal, to use it again without typing it again.
+ */
 @Composable
-private fun EatenMealDetail(meal: EatenMeal, images: Map<Long, ByteArray>, photos: Map<String, ByteArray>, timeText: (Long) -> String, onDismiss: () -> Unit) {
+private fun EatenMealDetail(meal: EatenMeal, images: Map<Long, ByteArray>, photos: Map<String, ByteArray>, timeText: (Long) -> String, onSave: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(meal.name ?: timeText(meal.timestamp)) },
@@ -532,7 +545,8 @@ private fun EatenMealDetail(meal: EatenMeal, images: Map<Long, ByteArray>, photo
                 NutritionLine(Nutrition.sum(meal.items.map { it.nutrition }))
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(CoreUiStrings.close)) } }
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(CoreUiStrings.close)) } },
+        dismissButton = { TextButton(onClick = onSave) { Text(stringResource(UiStrings.food_book_save_title)) } }
     )
 }
 
@@ -717,6 +731,20 @@ internal fun SaveRecipeDialog(
                     singleLine = true,
                     isError = state.saveName.isBlank()
                 )
+                // A meal of the history: what the new dish gives today can differ from what was eaten.
+                state.saveEaten?.let { save ->
+                    if (save.carbsNow != null && save.carbsNow != save.meal.wizardCarbs)
+                        Text(
+                            text = stringResource(
+                                UiStrings.food_book_save_eaten_carbs,
+                                stringResource(InterfacesStrings.format_carbs, save.carbsNow),
+                                stringResource(InterfacesStrings.format_carbs, save.meal.wizardCarbs)
+                            ),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    if (save.keptAsTyped)
+                        Text(stringResource(UiStrings.food_book_save_eaten_typed), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         },
         confirmButton = { TextButton(onClick = onConfirm, enabled = state.saveName.isNotBlank()) { Text(stringResource(CoreUiStrings.save)) } },

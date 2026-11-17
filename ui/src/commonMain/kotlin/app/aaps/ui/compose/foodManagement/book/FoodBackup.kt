@@ -76,6 +76,7 @@ data class FoodArchive(
  *   without it, a restored food is added a second time when Nightscout sends it again.
  * @param barcode the Open Food Facts product of the food. Its photo is "images/<barcode>.jpg".
  * @param noOffPhoto true when Open Food Facts has no photo for [barcode]: it is never asked again
+ * @param notInOff true when Open Food Facts did not know [barcode]: the food was typed by hand with it
  * @param image key of the photo taken by the user. Its file is "images/<key>.jpg".
  * @param fiber not kept by the POC: always empty in a file of the POC
  * @param note not kept by the POC: always empty in a file of the POC
@@ -97,6 +98,7 @@ data class ArchiveFood(
     val gi: Int? = null,
     val barcode: String? = null,
     val noOffPhoto: Boolean = false,
+    val notInOff: Boolean = false,
     val image: String? = null,
     val note: String? = null,
 )
@@ -177,6 +179,7 @@ internal object FoodBackupMath {
                         gi = food.gi,
                         barcode = link?.barcode,
                         noOffPhoto = link?.hasImage == false,
+                        notInOff = link?.inOff == false,
                         image = photos[food.id]?.key,
                     )
                 },
@@ -223,7 +226,7 @@ internal object FoodBackupMath {
         recipes = archive.recipes,
         eaten = archive.eaten,
         // The address of the photo is not in the file: a missing photo reads the product again.
-        offLinks = archive.foods.mapNotNull { food -> food.barcode?.let { OffLink(foodId = food.id, barcode = it, hasImage = !food.noOffPhoto) } },
+        offLinks = archive.foods.mapNotNull { food -> food.barcode?.let { OffLink(foodId = food.id, barcode = it, hasImage = !food.noOffPhoto, inOff = !food.notInOff) } },
         photos = archive.foods.mapNotNull { food -> food.image?.let { FoodPhoto(foodId = food.id, key = it) } },
     )
 
@@ -263,7 +266,11 @@ internal object FoodBackupMath {
                 })
             }
         val eatenIds = book.eaten.map { it.id }.toSet()
-        val meals = backup.eaten.filter { it.id !in eatenIds }
+        // The ids of the other phone mean nothing here: each line points to the food or dish found
+        // on this phone, or to nothing (its photo is then not shown, and it is never the wrong one).
+        val meals = backup.eaten.filter { it.id !in eatenIds }.map { meal ->
+            meal.copy(items = meal.items.map { item -> item.copy(foodId = item.foodId?.let { foodIds[it] }, recipeId = item.recipeId?.let { recipeIds[it] ?: it }) })
+        }
         // The product of a food follows the food found for it. A food that already has one keeps it.
         val linkedIds = book.offLinks.map { it.foodId }.toSet()
         val offLinks = backup.offLinks

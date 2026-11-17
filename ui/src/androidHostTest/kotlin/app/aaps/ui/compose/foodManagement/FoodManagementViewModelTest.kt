@@ -11,6 +11,7 @@ import app.aaps.core.interfaces.resources.TextResolver
 import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.core.interfaces.utils.DecimalFormatter
 import app.aaps.ui.UiStrings
+import app.aaps.ui.compose.foodManagement.book.EatenItem
 import app.aaps.ui.compose.foodManagement.book.EatenMeal
 import app.aaps.ui.compose.foodManagement.book.ExportFile
 import app.aaps.ui.compose.foodManagement.book.OffLink
@@ -31,6 +32,7 @@ import app.aaps.ui.compose.foodManagement.book.Recipe
 import app.aaps.ui.compose.foodManagement.book.RecipeItem
 import app.aaps.ui.compose.foodManagement.book.RecipeKind
 import app.aaps.ui.compose.foodManagement.openfoodfacts.OffProduct
+import app.aaps.ui.compose.foodManagement.openfoodfacts.OffResult
 import app.aaps.ui.compose.foodManagement.openfoodfacts.OpenFoodFactsRepository
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.Dispatchers
@@ -49,6 +51,7 @@ import org.mockito.MockitoAnnotations
 import org.mockito.kotlin.any
 import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.eq
+import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 
@@ -535,6 +538,88 @@ internal class FoodManagementViewModelTest {
         sut.send(MealTarget.CARBS)
         runUntil { sut.uiState.value.eatenMeals.size == 2 }
         assertThat(sut.uiState.value.eatenMeals.first().changed).isTrue()
+    }
+
+    @Test
+    fun `a dish line of an eaten meal keeps its dish`() {
+        loadFoods(bread)
+        val toast = Recipe("toast", "Toast", RecipeKind.DISH, listOf(RecipeItem("Bread", 40.0, "g", foodId = 1)))
+        whenever(rh.gs(UiStrings.food_book_servings)).thenReturn("servings")
+        whenever(dateUtil.now()).thenReturn(1_000_000)
+
+        sut.send(toast, MealTarget.CARBS)
+        runUntil { sut.uiState.value.eatenMeals.isNotEmpty() }
+
+        assertThat(sut.uiState.value.eatenMeals.first().items.single().recipeId).isEqualTo("toast")
+    }
+
+    @Test
+    fun `a meal of the history is saved as a dish and then shows that name with its lines`() {
+        val milk = FD(id = 2, name = "Milk", portion = 250.0, unit = "ml", carbs = 12)
+        val book = FoodBookRepository(MemoryFoodBookStore(), aapsLogger)
+        val vm = screenWith(book, bread, milk)
+        whenever(rh.gs(UiStrings.food_book_servings)).thenReturn("servings")
+        whenever(dateUtil.now()).thenReturn(1_000_000)
+        vm.askQuantity(bread)
+        vm.updateQuantity("80")
+        vm.confirmQuantity()
+        vm.askQuantity(milk)
+        vm.confirmQuantity()
+        vm.send(MealTarget.CARBS)
+        runUntil { book.book.value.eaten.isNotEmpty() }
+        val eaten = book.book.value.eaten.single()
+
+        vm.openSaveEaten(eaten)
+        val save = vm.uiState.value.saveEaten!!
+        assertThat(vm.uiState.value.showSave).isTrue()
+        assertThat(save.carbsNow).isEqualTo(eaten.wizardCarbs)
+        assertThat(save.keptAsTyped).isFalse()
+        vm.updateSaveName("Snack")
+        vm.updateSaveKind(RecipeKind.DISH)
+        vm.confirmSave()
+        runUntil { book.book.value.eaten.single().name == "Snack" }
+
+        val dish = book.book.value.recipes.single()
+        assertThat(dish.name).isEqualTo("Snack")
+        assertThat(dish.kind).isEqualTo(RecipeKind.DISH)
+        assertThat(dish.items).containsExactly(RecipeItem("Bread", 80.0, "g", foodId = 1), RecipeItem("Milk", 250.0, "ml", foodId = 2)).inOrder()
+        val named = book.book.value.eaten.single()
+        assertThat(named.savedLater).isTrue()
+        assertThat(named.note).isEqualTo(eaten.note) // the link to the treatment uses it
+        assertThat(named.items).isEqualTo(eaten.items)
+        assertThat(vm.uiState.value.showSave).isFalse()
+        assertThat(vm.uiState.value.saveEaten).isNull()
+    }
+
+    @Test
+    fun `a meal of the history is not saved under a name already used`() {
+        val book = FoodBookRepository(MemoryFoodBookStore(), aapsLogger)
+        runBlocking { book.saveRecipe(Recipe("old", "Snack", RecipeKind.MEAL, emptyList())) }
+        val vm = screenWith(book, bread)
+        runUntil { vm.uiState.value.recipes.isNotEmpty() }
+        whenever(rh.gs(UiStrings.food_book_servings)).thenReturn("servings")
+        val eaten = EatenMeal("e", timestamp = 0, name = null, note = "n", wizardCarbs = 40, items = listOf(EatenItem("Bread", 80.0, "g", 40.0, fat = null, protein = null, energyKj = null, foodId = 1)))
+
+        vm.openSaveEaten(eaten)
+        vm.updateSaveName("snack")
+        vm.confirmSave()
+
+        assertThat(vm.uiState.value.showSave).isTrue()
+        assertThat(book.book.value.recipes.map { it.id }).containsExactly("old")
+    }
+
+    @Test
+    fun `saving the meal being put together is not mixed with a meal of the history`() {
+        whenever(rh.gs(UiStrings.food_book_servings)).thenReturn("servings")
+        val eaten = EatenMeal("e", timestamp = 0, name = null, note = "n", wizardCarbs = 40, items = emptyList())
+        sut.openSaveEaten(eaten)
+        sut.dismissSave()
+        assertThat(sut.uiState.value.saveEaten).isNull()
+
+        sut.openSaveEaten(eaten)
+        sut.openSave()
+
+        assertThat(sut.uiState.value.saveEaten).isNull()
     }
 
     // ---- Delete with a long press, categories, unit ----
@@ -1147,6 +1232,138 @@ internal class FoodManagementViewModelTest {
         sut.updateEditorPortion("200")
 
         assertThat(sut.uiState.value.editorCarbs).isEqualTo("50")
+    }
+
+    // ---- Barcodes: already in the list, unknown to OFF, shown in the editor ----
+
+    private val nutella = FD(id = 5, name = "Nutella", category = "Breakfast", subCategory = "Spread", portion = 15.0, unit = "g", carbs = 9)
+    private val nutellaCode = "3017620422003"
+    private val unknownCode = "2000000000017"
+
+    /** A screen whose food book has [links], with [foods] in the database. A food saved here gets the id 100. OFF knows nothing. */
+    private fun barcodeScreen(links: List<OffLink>, vararg foods: FD): Pair<FoodManagementViewModel, FoodBookRepository> {
+        val inDb = foods.toMutableList()
+        val book = FoodBookRepository(MemoryFoodBookStore(), aapsLogger)
+        runBlocking {
+            whenever(persistenceLayer.getFoods()).thenAnswer { inDb.toList() }
+            whenever(persistenceLayer.insertOrUpdateFood(any())).thenAnswer {
+                inDb += (it.arguments[0] as FD).copy(id = 100)
+                PersistenceLayer.TransactionResult<FD>()
+            }
+            whenever(openFoodFacts.lookup(any())).thenReturn(OffResult.NotFound)
+            links.forEach { book.saveOffLink(it) }
+        }
+        val vm = FoodManagementViewModel(persistenceLayer, aapsLogger, openFoodFacts, rh, book, dateUtil, decimalFormatter, FoodCsv(rh, dateUtil, decimalFormatter, NoFoodExportFiles()), NoFoodExportFiles(), FoodImages(NoFoodImageStore(), openFoodFacts, book, aapsLogger))
+        dispatcher.scheduler.runCurrent()
+        runUntil { !vm.uiState.value.isLoading && vm.uiState.value.foodBarcodes.size == links.size }
+        return vm to book
+    }
+
+    @Test
+    fun `a barcode already in the list is shown without asking OFF, and its food can be opened`() {
+        val (vm, _) = barcodeScreen(listOf(OffLink(foodId = 5, barcode = nutellaCode, hasImage = true)), nutella)
+        vm.openImport()
+        vm.updateImportQuery(nutellaCode)
+
+        vm.runImport()
+
+        assertThat(vm.uiState.value.barcodeOwners).containsExactly(nutella)
+        runBlocking { verify(openFoodFacts, never()).lookup(any()) }
+
+        vm.openBarcodeOwner(nutella)
+
+        val state = vm.uiState.value
+        assertThat(state.barcodeOwners).isEmpty()
+        assertThat(state.showImport).isFalse()
+        assertThat(state.showEditor).isTrue()
+        assertThat(state.editorFood).isEqualTo(nutella)
+        assertThat(state.editorBarcode).isEqualTo(nutellaCode)
+    }
+
+    @Test
+    fun `the same barcode with a zero in front is found`() {
+        val (vm, _) = barcodeScreen(listOf(OffLink(foodId = 5, barcode = nutellaCode, hasImage = true)), nutella)
+        vm.updateImportQuery("0$nutellaCode")
+
+        vm.runImport()
+
+        assertThat(vm.uiState.value.barcodeOwners).containsExactly(nutella)
+    }
+
+    @Test
+    fun `another food for a barcode in the list asks OFF`() {
+        val (vm, _) = barcodeScreen(listOf(OffLink(foodId = 5, barcode = nutellaCode, hasImage = true)), nutella)
+        vm.updateImportQuery(nutellaCode)
+        vm.runImport()
+
+        vm.importAnyway()
+        runUntil { vm.uiState.value.importResult != null }
+
+        assertThat(vm.uiState.value.barcodeOwners).isEmpty()
+        assertThat(vm.uiState.value.importResult).isEqualTo(OffResult.NotFound)
+        runBlocking { verify(openFoodFacts).lookup(nutellaCode) }
+    }
+
+    @Test
+    fun `the barcode of a deleted food does not count`() {
+        val (vm, _) = barcodeScreen(listOf(OffLink(foodId = 9, barcode = nutellaCode, hasImage = true)), nutella)
+        vm.updateImportQuery(nutellaCode)
+
+        vm.runImport()
+        runUntil { vm.uiState.value.importResult != null }
+
+        assertThat(vm.uiState.value.barcodeOwners).isEmpty()
+        runBlocking { verify(openFoodFacts).lookup(nutellaCode) }
+    }
+
+    @Test
+    fun `a barcode OFF does not know makes a food typed by hand that keeps it`() {
+        val (vm, book) = barcodeScreen(emptyList(), nutella)
+        vm.openImport()
+        vm.updateImportQuery(unknownCode)
+        vm.runImport()
+        runUntil { vm.uiState.value.importResult == OffResult.NotFound }
+
+        vm.makeFoodWithBarcode()
+
+        assertThat(vm.uiState.value.showImport).isFalse()
+        assertThat(vm.uiState.value.showEditor).isTrue()
+        assertThat(vm.uiState.value.editorFood).isNull()
+        assertThat(vm.uiState.value.editorScaleMode).isFalse()
+        assertThat(vm.uiState.value.editorBarcode).isEqualTo(unknownCode)
+        vm.updateEditorName("Home biscuits")
+        vm.updateEditorCarbs("12")
+        vm.saveFood()
+        runUntil { book.book.value.offLinks.isNotEmpty() }
+
+        assertThat(book.book.value.offLinks).containsExactly(OffLink(foodId = 100, barcode = unknownCode, hasImage = false, inOff = false))
+    }
+
+    @Test
+    fun `search words are never offered as a barcode for a new food`() {
+        val (vm, _) = barcodeScreen(emptyList(), nutella)
+        vm.openImport()
+        vm.updateImportQuery("biscuits")
+        vm.runImport()
+        runUntil { vm.uiState.value.importResult == OffResult.NotFound }
+
+        vm.makeFoodWithBarcode()
+
+        assertThat(vm.uiState.value.showEditor).isFalse()
+    }
+
+    @Test
+    fun `the editor shows the barcode of a food and of an OFF product, none for a food typed by hand`() {
+        val (vm, _) = barcodeScreen(listOf(OffLink(foodId = 5, barcode = nutellaCode, hasImage = true)), nutella)
+
+        vm.openEditor(nutella)
+        assertThat(vm.uiState.value.editorBarcode).isEqualTo(nutellaCode)
+
+        vm.openEditor()
+        assertThat(vm.uiState.value.editorBarcode).isNull()
+
+        vm.selectOffProduct(yogurt)
+        assertThat(vm.uiState.value.editorBarcode).isEqualTo(yogurt.barcode)
     }
 
     @Test

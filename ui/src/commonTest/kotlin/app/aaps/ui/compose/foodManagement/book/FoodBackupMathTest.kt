@@ -63,6 +63,21 @@ class FoodBackupMathTest {
     }
 
     @Test
+    fun `a barcode that Open Food Facts did not know stays marked as such`() {
+        val book = FoodBook(offLinks = listOf(OffLink(foodId = 4, barcode = "2000000000017", hasImage = false, inOff = false), OffLink(foodId = 3, barcode = BARCODE, hasImage = false)))
+
+        val text = FoodBackupMath.encode(listOf(bread, yogurt), book, now = 5000)
+        val backup = assertNotNull(FoodBackupMath.decode(text))
+
+        // Written only when true: a file of the final version without it is read as "known".
+        assertEquals(1, Regex("notInOff").findAll(text).count())
+        assertEquals(
+            listOf(OffLink(foodId = 3, barcode = BARCODE, hasImage = false), OffLink(foodId = 4, barcode = "2000000000017", hasImage = false, inOff = false)),
+            backup.offLinks
+        )
+    }
+
+    @Test
     fun `a meal still waiting for its treatment is not in the backup`() {
         val waiting = eaten.copy(id = "eaten-2", validatedAt = null, treatmentId = null)
 
@@ -218,6 +233,27 @@ class FoodBackupMathTest {
         assertEquals("dish-1", meal.items[0].recipeId)
         assertEquals(51L, meal.items[1].foodId)
         assertEquals(listOf(eatenInBackup), merge.meals)
+    }
+
+    @Test
+    fun `the lines of a restored meal point to the foods and dishes of this phone`() {
+        val meal = eaten.copy(
+            id = "eaten-7",
+            items = listOf(
+                EatenItem("Bread", 40.0, "g", 20.0, fat = null, protein = null, energyKj = null, foodId = 3),
+                EatenItem("Toast", 1.0, "servings", 20.0, fat = null, protein = null, energyKj = null, recipeId = "dish-1"),
+                EatenItem("Ham", 50.0, "g", 1.0, fat = null, protein = null, energyKj = null, foodId = 77),
+            )
+        )
+        val backup = assertNotNull(FoodBackupMath.decode(FoodBackupMath.encode(listOf(bread), FoodBook(listOf(toast), listOf(meal)), now = 5000)))
+        val here = listOf(FD(id = 50, ids = IDs(nightscoutId = NS_BREAD), name = "Bread", portion = 100.0, unit = "g", carbs = 50))
+        val book = FoodBook(recipes = listOf(Recipe("dish-9", "Toast", RecipeKind.DISH, emptyList())))
+
+        val items = FoodBackupMath.merge(backup, here, book).meals.single().items
+
+        // Bread is food 50 here, toast is dish 9 here, and food 77 was not in the backup: no food.
+        assertEquals(listOf(50L, null, null), items.map { it.foodId })
+        assertEquals(listOf(null, "dish-9", null), items.map { it.recipeId })
     }
 
     @Test

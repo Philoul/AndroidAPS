@@ -284,7 +284,7 @@ class FoodManagementViewModel(
             foodBook.load()
             refreshTreatmentLinks()
             foodBook.book.collect { book ->
-                _uiState.update { it.copy(recipes = book.recipes, eatenMeals = book.eaten) }
+                _uiState.update { it.copy(recipes = book.recipes, eatenMeals = book.eaten, foodBarcodes = book.offLinks.associate { link -> link.foodId to link.barcode }) }
                 loadRecipePhotos(book)
             }
         }
@@ -372,6 +372,7 @@ class FoodManagementViewModel(
                     editorFat = food.fat?.toString() ?: "",
                     editorProtein = food.protein?.toString() ?: "",
                     editorEnergy = food.energy?.toString() ?: "",
+                    editorBarcode = it.foodBarcodes[food.id],
                     editorSaveAttempted = false,
                     editorOffProduct = null,
                     editorScaleMode = false,
@@ -397,6 +398,7 @@ class FoodManagementViewModel(
                     editorFat = "",
                     editorProtein = "",
                     editorEnergy = "",
+                    editorBarcode = null,
                     editorSaveAttempted = false,
                     editorOffProduct = null,
                     editorScaleMode = false,
@@ -466,17 +468,53 @@ class FoodManagementViewModel(
         runImport()
     }
 
-    /** Sent only when the user asks: OFF allows about 10 searches per minute. */
-    fun runImport() {
+    /**
+     * Sent only when the user asks: OFF allows about 10 searches per minute.
+     *
+     * A barcode already in the list is shown first, without asking OFF: it is local, works without
+     * network and keeps a request. [checkList] is false when the user wants another food for it anyway
+     * (another portion, for example).
+     */
+    fun runImport(checkList: Boolean = true) {
         val state = uiState.value
         val query = state.importQuery.trim()
         if (query.isEmpty() || state.importInProgress) return
+        if (checkList && OpenFoodFactsRepository.isBarcode(query)) {
+            val owners = state.foodsWithBarcode(query)
+            if (owners.isNotEmpty()) return _uiState.update { it.copy(barcodeOwners = owners, importResult = null) }
+        }
         _uiState.update { it.copy(importInProgress = true, importResult = null) }
         viewModelScope.launch {
             val result = openFoodFacts.lookup(query)
             _uiState.update { it.copy(importInProgress = false, importResult = result, importImages = emptyMap()) }
             if (result is OffResult.Found) loadImportImages(result.products)
         }
+    }
+
+    /** The barcode is in the list: opens that food instead of asking OFF. */
+    fun openBarcodeOwner(food: FD) {
+        _uiState.update { it.copy(barcodeOwners = emptyList(), showImport = false, showScanner = false) }
+        openEditor(food)
+    }
+
+    /** The barcode is in the list, and the user wants another food for the same product. */
+    fun importAnyway() {
+        _uiState.update { it.copy(barcodeOwners = emptyList()) }
+        runImport(checkList = false)
+    }
+
+    fun dismissBarcodeOwners() = _uiState.update { it.copy(barcodeOwners = emptyList()) }
+
+    /**
+     * OFF does not know the barcode: a new food is typed by hand with it, so the barcode is not lost.
+     * The next scan finds the food, and the product can be sent to OFF later.
+     */
+    fun makeFoodWithBarcode() {
+        val code = uiState.value.importQuery.trim()
+        if (!OpenFoodFactsRepository.isBarcode(code)) return
+        closeImport()
+        openEditor()
+        _uiState.update { it.copy(editorBarcode = code) }
     }
 
     /**
@@ -513,6 +551,7 @@ class FoodManagementViewModel(
                 editorName = MealMath.foodValuesFrom(product).name,
                 editorCategory = OFF_CATEGORY,
                 editorOffProduct = product,
+                editorBarcode = product.barcode,
                 // An OFF product starts in the portion mode: the values follow the portion.
                 editorScaleMode = true,
                 editorImage = it.importImages[product.barcode],
@@ -819,11 +858,25 @@ class FoodManagementViewModel(
     private fun nameUsed(name: String, kind: RecipeKind, except: String? = null): Boolean =
         uiState.value.recipes.any { it.kind == kind && it.id != except && it.name.equals(name, ignoreCase = true) }
 
-    fun openSave() = _uiState.update { it.copy(showSave = true, saveName = "", saveKind = it.mealSource?.kind ?: RecipeKind.MEAL) }
+    fun openSave() = _uiState.update { it.copy(showSave = true, saveName = "", saveKind = it.mealSource?.kind ?: RecipeKind.MEAL, saveEaten = null) }
+
+    /**
+     * Opens the save dialog for [meal] of the history, so a meal put together on the spot can be used
+     * again without typing it again. The dialog says when the total of today differs from what was
+     * eaten, and when a line is kept as typed by hand.
+     */
+    fun openSaveEaten(meal: EatenMeal) {
+        val items = FoodBookMath.recipeItemsOf(meal, foodsById(), uiState.value.recipes, rh.gs(UiStrings.food_book_servings))
+        val carbsNow = nutritionOf(Recipe(id = "", name = "", kind = RecipeKind.MEAL, items = items))?.carbs?.roundToInt()
+        val typed = items.count { it.estimatedCarbs != null } > meal.items.count { it.estimated }
+        _uiState.update {
+            it.copy(showSave = true, saveName = meal.name.orEmpty(), saveKind = RecipeKind.MEAL, saveEaten = EatenSave(meal, items, carbsNow, typed))
+        }
+    }
 
     fun updateSaveName(v: String) = _uiState.update { it.copy(saveName = v) }
     fun updateSaveKind(kind: RecipeKind) = _uiState.update { it.copy(saveKind = kind) }
-    fun dismissSave() = _uiState.update { it.copy(showSave = false) }
+    fun dismissSave() = _uiState.update { it.copy(showSave = false, saveEaten = null) }
 
     /**
      * Saves the meal being put together as a new dish or standard meal. A name already used is
@@ -833,12 +886,30 @@ class FoodManagementViewModel(
     fun confirmSave() {
         val state = uiState.value
         val name = state.saveName.trim()
+        state.saveEaten?.let { return saveEatenMeal(it, name, state.saveKind) }
         if (name.isEmpty() || state.mealItems.isEmpty()) return
         if (state.mealItems.any { it.problem != null }) return showMessage(UiStrings.food_book_remove_missing)
         if (nameUsed(name, state.saveKind)) return showMessage(UiStrings.food_book_name_used, name)
         val recipe = Recipe(id = Uuid.random().toString(), name = name, kind = state.saveKind, items = recipeItemsOf(state.mealItems))
         viewModelScope.launch { foodBook.saveRecipe(recipe) }
         _uiState.update { it.copy(showSave = false, mealSource = recipe) }
+        showMessage(UiStrings.food_book_saved, name)
+    }
+
+    /**
+     * Saves a meal of the history as a new dish or standard meal, and gives the meal that name. A name
+     * already used is refused, as for any new dish. The note of the meal does not change.
+     */
+    @OptIn(ExperimentalUuidApi::class)
+    private fun saveEatenMeal(save: EatenSave, name: String, kind: RecipeKind) {
+        if (name.isEmpty() || save.items.isEmpty()) return
+        if (nameUsed(name, kind)) return showMessage(UiStrings.food_book_name_used, name)
+        val recipe = Recipe(id = Uuid.random().toString(), name = name, kind = kind, items = save.items, photo = save.meal.photo)
+        viewModelScope.launch {
+            foodBook.saveRecipe(recipe)
+            foodBook.nameEatenMeal(save.meal.id, name)
+        }
+        _uiState.update { it.copy(showSave = false, saveEaten = null) }
         showMessage(UiStrings.food_book_saved, name)
     }
 
@@ -891,7 +962,7 @@ class FoodManagementViewModel(
             wizardCarbs = carbs,
             items = items.map {
                 EatenItem(
-                    it.name, it.quantity, it.unit, it.carbs, it.fat, it.protein, it.energyKj, estimated = it.estimated, foodId = it.foodId,
+                    it.name, it.quantity, it.unit, it.carbs, it.fat, it.protein, it.energyKj, estimated = it.estimated, foodId = it.foodId, recipeId = it.recipeId,
                     photo = it.recipeId?.let { id -> recipes[id]?.photo }, partial = it.partial
                 )
             },
@@ -1093,6 +1164,8 @@ class FoodManagementViewModel(
         )
 
         val product = state.editorOffProduct
+        // A new food typed by hand for a barcode OFF does not know keeps the barcode.
+        val barcode = state.editorBarcode.takeIf { product == null && state.editorFood == null }
         val photo = state.editorImage
         val userPhoto = state.editorUserPhoto
         val photoChanged = state.editorPhotoChanged
@@ -1102,10 +1175,11 @@ class FoodManagementViewModel(
                 persistenceLayer.insertOrUpdateFood(food)
                 _uiState.update { it.copy(showEditor = false, showPhotoCamera = false) }
                 warnUnitChanged(state.editorFood, food)
-                if (product == null && !photoChanged) return@launch
+                if (product == null && barcode == null && !photoChanged) return@launch
                 val foodId = savedFoodId(food, lastId) ?: return@launch
                 // The OFF product with its photo, then the photo of the user, which is shown instead.
                 if (product != null) foodImages.link(foodId, product, photo)
+                else if (barcode != null) foodImages.linkBarcode(foodId, barcode)
                 if (photoChanged) foodImages.setUserPhoto(foodId, userPhoto)
                 val shown = foodImages.saved(listOf(foodId))[foodId]
                 _uiState.update { it.copy(foodImages = if (shown != null) it.foodImages + (foodId to shown) else it.foodImages - foodId) }
@@ -1283,6 +1357,8 @@ data class FoodManagementUiState(
     val editorUserPhoto: ByteArray? = null,
     /** True when the user took or removed a photo in the editor: it is saved with the food. */
     val editorPhotoChanged: Boolean = false,
+    /** The barcode of the editor food, shown small at the bottom of the editor. Null when it has none. */
+    val editorBarcode: String? = null,
     val showPhotoCamera: Boolean = false,
     /** The photo shown for each food on the list, by food id: the photo of the user, or else the OFF photo. */
     val foodImages: Map<Long, ByteArray> = emptyMap(),
@@ -1296,6 +1372,10 @@ data class FoodManagementUiState(
     /** The photos of the products found, by barcode, added as they are downloaded. */
     val importImages: Map<String, ByteArray> = emptyMap(),
     val showScanner: Boolean = false,
+    /** The foods that already have the barcode just scanned or typed. The dialog is shown while not empty. */
+    val barcodeOwners: List<FD> = emptyList(),
+    /** The barcode of each food that has one, by food id. The POC keeps it in the OFF links of the food book. */
+    val foodBarcodes: Map<Long, String> = emptyMap(),
     // Meal (proof of concept)
     val mealItems: List<MealItem> = emptyList(),
     val showMeal: Boolean = false,
@@ -1313,6 +1393,8 @@ data class FoodManagementUiState(
     val showSave: Boolean = false,
     val saveName: String = "",
     val saveKind: RecipeKind = RecipeKind.MEAL,
+    /** The meal of the history the save dialog is open for, or null when it saves the meal being put together. */
+    val saveEaten: EatenSave? = null,
     /** Eaten meal id to the treatment found for it. */
     val treatmentLinks: Map<String, TreatmentLink> = emptyMap(),
     /** The line of the meal the quantity dialog changes, or null when the dialog adds a new line. */
@@ -1355,7 +1437,24 @@ data class FoodManagementUiState(
     fun imageOf(item: MealItem): ByteArray? =
         item.foodId?.let { foodImages[it] }
             ?: item.recipeId?.let { id -> recipes.firstOrNull { it.id == id }?.photo }?.let { recipePhotos[it] }
+
+    /** The foods of the list that have [barcode]. The same code with zeros in front counts ("0301..." is "301..."). */
+    fun foodsWithBarcode(barcode: String): List<FD> {
+        val code = barcode.trimStart('0')
+        return foods.filter { food -> foodBarcodes[food.id]?.trimStart('0') == code }
+    }
 }
+
+/**
+ * A meal of the history about to be saved as a dish or a standard meal.
+ *
+ * @param items the lines of the new dish or meal
+ * @param carbsNow its carbs with the foods of today, or null when one line cannot be computed
+ * @param keptAsTyped true when a line becomes a line typed by hand with the carbs eaten, because its
+ *   food or dish is not in the list any more, or its food is counted in another unit now
+ */
+@Immutable
+data class EatenSave(val meal: EatenMeal, val items: List<RecipeItem>, val carbsNow: Int?, val keptAsTyped: Boolean)
 
 enum class FoodTab { FOODS, DISHES, MEALS, HISTORY }
 
