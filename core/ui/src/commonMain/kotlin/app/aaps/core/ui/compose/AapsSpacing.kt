@@ -52,6 +52,10 @@ object AapsSpacing {
     val pumpFabRingSize = 36.dp
     val pumpFabRingStrokeWidth = 2.dp
 
+    // Photo of a food: small on a list card, larger at the top of the food editor
+    val foodThumbnailSize = 48.dp
+    val foodPhotoSize = 120.dp
+
     // Chip dimensions
     val chipCornerRadius = 8.dp
     val chipHeight = 35.dp

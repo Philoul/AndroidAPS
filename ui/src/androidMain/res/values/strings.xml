@@ -384,4 +384,31 @@
     <string name="cal_precheck_mark_sensor_change">Mark sensor change</string>
     <string name="graph_therapy_event_bg_with_note" comment="Shown when the user taps a BG check in the overview graph. %1$s = glucose with its unit, %2$s = the note the user wrote. Example: 6.1 mmol/L, before lunch">%1$s, %2$s</string>
 
+    <!-- Food screen: Open Food Facts import, food photos and editor modes -->
+    <string name="food_off_import">Import from Open Food Facts</string>
+    <string name="food_off_search_hint">Name or barcode</string>
+    <string name="food_off_scan">Scan a barcode</string>
+    <string name="food_off_camera_refused">The camera is needed to read a barcode.</string>
+    <string name="food_off_allow_camera">Allow the camera</string>
+    <string name="food_photo_take">Take a photo</string>
+    <string name="food_photo_remove">Remove the photo</string>
+    <string name="food_photo_camera_refused">The camera is needed to take a photo.</string>
+    <string name="food_off_not_found">No product found.</string>
+    <string name="food_off_offline">No internet connection. You need internet to import a food.</string>
+    <string name="food_off_failed">Open Food Facts did not answer. Try again in a minute.</string>
+    <string name="food_off_rate_limited">Too many searches in a short time. Wait one minute, then try again.</string>
+    <string name="food_off_warning_short">Data from volunteers, it can be wrong. Check it against the package.</string>
+    <string name="food_off_serving" comment="The serving written on the package, as Open Food Facts has it. %1$s = serving text. Example: Serving: 1 pot (125 g)">Serving: %1$s</string>
+    <string name="food_off_values_follow">Values follow the portion. A value you typed yourself is kept.</string>
+    <string name="food_off_warning">Volunteers enter the Open Food Facts data, and it can be wrong. Check every value against the package before you save. This is not medical advice.</string>
+    <string name="food_off_attribution">Data from Open Food Facts (openfoodfacts.org), under the Open Database License. Photos under the CC BY-SA license.</string>
+    <string name="food_off_unknown" comment="Shown in place of a nutrition value that Open Food Facts does not have">?</string>
+    <string name="food_off_carbs_per_100" comment="Carbs of a product per 100 g or 100 ml. %1$s = carbs with unit, %2$s = g or ml. Example: 12.5 g / 100 g">%1$s / 100 %2$s</string>
+    <string name="food_off_exact_values" comment="Values from Open Food Facts for 100 g or 100 ml, shown in the food editor. %1$s = g or ml, %2$s = carbs, %3$s = sugars, %4$s = fiber, each with its unit or ?. Example: Per 100 g: carbs 4.7 g, sugars 4.7 g, fiber 0 g">Per 100 %1$s: carbs %2$s, sugars %3$s, fiber %4$s</string>
+    <string name="food_off_no_carbs">Open Food Facts has no carbs value for this product. Enter it from the package.</string>
+    <string name="food_editor_mode_portion" comment="Choice in the food editor: the values follow the portion">Change the portion</string>
+    <string name="food_editor_mode_values" comment="Choice in the food editor: every value is typed as on the package">Change the values</string>
+    <string name="food_editor_mode_portion_hint">The values follow the portion.</string>
+    <string name="food_editor_mode_values_hint">Every value is typed as on the package. A new unit (1 biscuit instead of 100 g) is set here.</string>
+
 </resources>

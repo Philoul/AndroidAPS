@@ -95,6 +95,14 @@ kotlin {
                 // Ktor engine for this target. Replaces the direct OkHttp dependency the wiki search
                 // used before it was ported.
                 implementation(libs.io.ktor.client.okhttp)
+
+                // Food screen: reads product barcodes for the Open Food Facts import, and takes food
+                // photos. Same libraries as the QR code reader in :plugins:sync, no Play services needed.
+                implementation(libs.com.google.zxing.core)
+                implementation(libs.androidx.camera.camera2)
+                implementation(libs.androidx.camera.core)
+                implementation(libs.androidx.camera.lifecycle)
+                implementation(libs.androidx.camera.view)
             }
         }
 
