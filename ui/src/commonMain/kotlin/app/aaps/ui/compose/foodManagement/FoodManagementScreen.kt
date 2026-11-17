@@ -1,6 +1,8 @@
 package app.aaps.ui.compose.foodManagement
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,10 +27,15 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -37,16 +44,26 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -62,6 +79,7 @@ import app.aaps.core.ui.compose.LocalSnackbarHostState
 import app.aaps.core.ui.compose.consumeOverscroll
 import app.aaps.core.ui.compose.icons.IcCalculator
 import app.aaps.core.ui.compose.stringResource
+import app.aaps.ui.UiStrings
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -105,6 +123,11 @@ fun FoodManagementScreen(
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(CoreUiStrings.back))
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { viewModel.openImport() }) {
+                        Icon(Icons.Filled.CloudDownload, contentDescription = stringResource(UiStrings.food_off_import))
                     }
                 }
             )
@@ -180,6 +203,7 @@ fun FoodManagementScreen(
                     items(filteredFoods, key = { it.id }) { food ->
                         FoodItem(
                             food = food,
+                            image = state.foodImages[food.id],
                             onEdit = { viewModel.openEditor(food) },
                             onCalculate = { onNavigateToWizard(FoodValues.wizardCarbs(food.carbs), food.name) }
                         )
@@ -198,6 +222,8 @@ fun FoodManagementScreen(
             ) {
                 FoodEditorContent(
                     state = state,
+                    categories = state.allCategories,
+                    subCategories = viewModel.subCategoriesOf(state.editorCategory),
                     onNameChange = viewModel::updateEditorName,
                     onCategoryChange = viewModel::updateEditorCategory,
                     onSubCategoryChange = viewModel::updateEditorSubCategory,
@@ -213,7 +239,33 @@ fun FoodManagementScreen(
                     onDelete = if (state.editorFood != null) {
                         { focusManager.clearFocus(); viewModel.deleteAndCloseEditor() }
                     } else null,
-                    isEditing = state.editorFood != null
+                    isEditing = state.editorFood != null,
+                    onOffPerServingChange = viewModel::setOffPerServing,
+                    onOpenPhotoCamera = { focusManager.clearFocus(); viewModel.openPhotoCamera() },
+                    onClosePhotoCamera = viewModel::closePhotoCamera,
+                    onPhoto = viewModel::takePhoto,
+                    onRemovePhoto = viewModel::removePhoto,
+                    onScaleModeChange = viewModel::setScaleMode,
+                )
+            }
+        }
+
+        // Open Food Facts import
+        if (state.showImport) {
+            val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+            val focusManager = LocalFocusManager.current
+            ModalBottomSheet(
+                onDismissRequest = { focusManager.clearFocus(); viewModel.closeImport() },
+                sheetState = sheetState,
+            ) {
+                OffImportContent(
+                    state = state,
+                    onQueryChange = viewModel::updateImportQuery,
+                    onSearch = { focusManager.clearFocus(); viewModel.runImport() },
+                    onOpenScanner = { focusManager.clearFocus(); viewModel.openScanner() },
+                    onCloseScanner = viewModel::closeScanner,
+                    onScanned = viewModel::onBarcodeScanned,
+                    onSelect = viewModel::selectOffProduct,
                 )
             }
         }
@@ -223,6 +275,7 @@ fun FoodManagementScreen(
 @Composable
 private fun FoodItem(
     food: FD,
+    image: ByteArray?,
     onEdit: () -> Unit,
     onCalculate: () -> Unit,
 ) {
@@ -242,13 +295,18 @@ private fun FoodItem(
                 .padding(start = AapsSpacing.extraLarge, top = AapsSpacing.large, bottom = AapsSpacing.large, end = AapsSpacing.small),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // The photo of the package or of the plate tells close foods apart.
+            if (image != null) {
+                FoodPhoto(bytes = image, size = AapsSpacing.foodThumbnailSize)
+                Spacer(modifier = Modifier.width(AapsSpacing.medium))
+            }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = food.name,
                     style = MaterialTheme.typography.titleSmall
                 )
                 val details = buildString {
-                    if (food.portion > 0) append(stringResource(CoreUiStrings.value_with_unit, food.portion.toString(), food.unit))
+                    if (food.portion > 0) append(stringResource(CoreUiStrings.value_with_unit, FoodValues.formatPortion(food.portion), food.unit))
                     if (food.category != null) {
                         if (isNotEmpty()) append(" · ")
                         append(food.category)
@@ -306,9 +364,81 @@ private fun FoodItem(
     }
 }
 
+/**
+ * A text field that proposes the values already used, so the same group is not typed twice in two
+ * ways. The list shows the values that contain what is typed. A new text makes a new value.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SuggestionField(value: String, onValueChange: (String) -> Unit, label: String, suggestions: List<String>, modifier: Modifier = Modifier) {
+    var expanded by remember { mutableStateOf(false) }
+    // True once the user types in the field. A value set from outside (the "Open Food Facts" category
+    // of an import) is not a search: it must not hide the other choices.
+    var typedByUser by remember { mutableStateOf(false) }
+    val typed = value.trim()
+    // A value already chosen or filled in shows every choice, so another one can be picked without
+    // clearing it. While a new text is typed, only the values that contain it are shown.
+    val filtering = typedByUser && typed.isNotEmpty() && suggestions.none { it.equals(typed, ignoreCase = true) }
+    val shown = if (filtering) suggestions.filter { it.contains(typed, ignoreCase = true) } else suggestions
+    val open = expanded && shown.isNotEmpty()
+    // True while the list was opened with the arrow. ExposedDropdownMenuBox gives the focus to the
+    // text field each time the list opens, and the focus brings the keyboard, which hides the list.
+    // So the field cannot take the focus until the list is closed. A tap on the text still gives the
+    // focus, to type a new value.
+    var openedByArrow by remember { mutableStateOf(false) }
+    LaunchedEffect(open) { if (!open) openedByArrow = false }
+    val focusManager = LocalFocusManager.current
+    ExposedDropdownMenuBox(expanded = open, onExpandedChange = { expanded = it }, modifier = modifier) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = { onValueChange(it); typedByUser = true; expanded = true },
+            label = { Text(label) },
+            singleLine = true,
+            // No arrow when there is nothing to propose: the label keeps the whole width.
+            trailingIcon = if (suggestions.isEmpty()) null else {
+                {
+                    // The whole touch area opens the list, not only the small arrow: a tap next to
+                    // the arrow must not go to the text and bring the keyboard.
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .minimumInteractiveComponentSize()
+                            .pointerInput(Unit) {
+                                awaitEachGesture {
+                                    awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                                    openedByArrow = true
+                                    focusManager.clearFocus()
+                                }
+                            }
+                            .menuAnchor(ExposedDropdownMenuAnchorType.SecondaryEditable)
+                    ) {
+                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = open)
+                    }
+                }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .focusProperties { canFocus = !openedByArrow }
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable)
+        )
+        ExposedDropdownMenu(expanded = open, onDismissRequest = { expanded = false }) {
+            shown.forEach { item ->
+                DropdownMenuItem(
+                    text = { Text(item) },
+                    onClick = { onValueChange(item); typedByUser = false; expanded = false },
+                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun FoodEditorContent(
     state: FoodManagementUiState,
+    categories: List<String> = emptyList(),
+    subCategories: List<String> = emptyList(),
     onNameChange: (String) -> Unit,
     onCategoryChange: (String) -> Unit,
     onSubCategoryChange: (String) -> Unit,
@@ -323,6 +453,12 @@ internal fun FoodEditorContent(
     onCancel: () -> Unit,
     onDelete: (() -> Unit)?,
     isEditing: Boolean,
+    onOffPerServingChange: (Boolean) -> Unit = {},
+    onOpenPhotoCamera: () -> Unit = {},
+    onClosePhotoCamera: () -> Unit = {},
+    onPhoto: (ByteArray) -> Unit = {},
+    onRemovePhoto: () -> Unit = {},
+    onScaleModeChange: (Boolean) -> Unit = {},
 ) {
     Column(
         modifier = Modifier
@@ -340,6 +476,22 @@ internal fun FoodEditorContent(
             style = MaterialTheme.typography.titleLarge
         )
 
+        // The photo of the user, or else the package from OFF, to check the values against it.
+        // The OFF photo is downloaded again when the file is missing.
+        UserPhotoSection(
+            shown = state.editorUserPhoto ?: state.editorImage,
+            canRemove = state.editorUserPhoto != null,
+            showCamera = state.showPhotoCamera,
+            onOpenCamera = onOpenPhotoCamera,
+            onCloseCamera = onClosePhotoCamera,
+            onPhoto = onPhoto,
+            onRemove = onRemovePhoto,
+        )
+
+        state.editorOffProduct?.let {
+            OffEditorBanner(product = it, perServing = state.editorOffPerServing, onPerServingChange = onOffPerServingChange)
+        }
+
         OutlinedTextField(
             value = state.editorName,
             onValueChange = onNameChange,
@@ -349,22 +501,41 @@ internal fun FoodEditorContent(
             isError = state.editorSaveAttempted && state.editorName.isBlank()
         )
 
-        Row(horizontalArrangement = Arrangement.spacedBy(AapsSpacing.large)) {
-            OutlinedTextField(
-                value = state.editorCategory,
-                onValueChange = onCategoryChange,
-                label = { Text(stringResource(CoreUiStrings.category)) },
-                modifier = Modifier.weight(1f),
-                singleLine = true
-            )
-            OutlinedTextField(
-                value = state.editorSubCategory,
-                onValueChange = onSubCategoryChange,
-                label = { Text(stringResource(CoreUiStrings.subcategory)) },
-                modifier = Modifier.weight(1f),
-                singleLine = true
-            )
+        // One field per row: the list arrow takes width, and a long label must not wrap.
+        // Only the subcategories of the chosen category are proposed.
+        SuggestionField(
+            value = state.editorCategory,
+            onValueChange = onCategoryChange,
+            label = stringResource(CoreUiStrings.category),
+            suggestions = categories,
+            modifier = Modifier.fillMaxWidth()
+        )
+        SuggestionField(
+            value = state.editorSubCategory,
+            onValueChange = onSubCategoryChange,
+            label = stringResource(CoreUiStrings.subcategory),
+            suggestions = subCategories,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        // Portion mode: the values follow the portion. Values mode: every field is typed, for example
+        // to fix an OFF value or to count a food in biscuits instead of grams.
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            val modes = listOf(true to UiStrings.food_editor_mode_portion, false to UiStrings.food_editor_mode_values)
+            modes.forEachIndexed { index, (scale, label) ->
+                SegmentedButton(
+                    selected = state.editorScaleMode == scale,
+                    onClick = { onScaleModeChange(scale) },
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = modes.size)
+                ) { Text(stringResource(label)) }
+            }
         }
+        Text(
+            text = stringResource(if (state.editorScaleMode) UiStrings.food_editor_mode_portion_hint else UiStrings.food_editor_mode_values_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        val valuesEditable = !state.editorScaleMode
 
         Row(horizontalArrangement = Arrangement.spacedBy(AapsSpacing.large)) {
             OutlinedTextField(
@@ -380,7 +551,8 @@ internal fun FoodEditorContent(
                 onValueChange = onUnitChange,
                 label = { Text(stringResource(CoreUiStrings.unit_label)) },
                 modifier = Modifier.weight(1f),
-                singleLine = true
+                singleLine = true,
+                enabled = valuesEditable
             )
         }
 
@@ -390,6 +562,7 @@ internal fun FoodEditorContent(
             label = { Text(stringResource(CoreUiStrings.label_carbs_g)) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
+            enabled = valuesEditable,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
         )
 
@@ -400,6 +573,7 @@ internal fun FoodEditorContent(
                 label = { Text(stringResource(CoreUiStrings.label_fat_g)) },
                 modifier = Modifier.weight(1f),
                 singleLine = true,
+                enabled = valuesEditable,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
             )
             OutlinedTextField(
@@ -408,6 +582,7 @@ internal fun FoodEditorContent(
                 label = { Text(stringResource(CoreUiStrings.label_protein_g)) },
                 modifier = Modifier.weight(1f),
                 singleLine = true,
+                enabled = valuesEditable,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
             )
             OutlinedTextField(
@@ -416,6 +591,7 @@ internal fun FoodEditorContent(
                 label = { Text(stringResource(CoreUiStrings.label_energy_kj)) },
                 modifier = Modifier.weight(1f),
                 singleLine = true,
+                enabled = valuesEditable,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
             )
         }

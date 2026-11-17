@@ -1,6 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- The food screen reads product barcodes and takes food photos. Without a camera, the barcode
+         is typed and the foods have no photo of the user. -->
+    <uses-feature
+        android:name="android.hardware.camera.any"
+        android:required="false" />
+
+    <uses-permission android:name="android.permission.CAMERA" />
+
     <application android:supportsRtl="true">
 
         <activity
