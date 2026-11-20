@@ -4,8 +4,6 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -29,7 +27,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -63,7 +60,7 @@ import app.aaps.core.ui.compose.consumeOverscroll
 import app.aaps.core.ui.compose.icons.IcCalculator
 import app.aaps.core.ui.compose.stringResource
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FoodManagementScreen(
     viewModel: FoodManagementViewModel,
@@ -72,7 +69,8 @@ fun FoodManagementScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val filteredFoods by viewModel.filteredFoods.collectAsStateWithLifecycle()
-    val filteredSubCategories by viewModel.filteredSubCategories.collectAsStateWithLifecycle()
+    val categoryChoices by viewModel.categoryChoices.collectAsStateWithLifecycle()
+    val subCategoryChoices by viewModel.subCategoryChoices.collectAsStateWithLifecycle()
     val snackbarHostState = LocalSnackbarHostState.current
     val undoLabel = stringResource(CoreUiStrings.undo)
     val deletedLabel = stringResource(CoreUiStrings.food_deleted)
@@ -120,43 +118,18 @@ fun FoodManagementScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // Filter chips
-            if (state.allCategories.isNotEmpty()) {
-                FlowRow(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = AapsSpacing.extraLarge),
-                    horizontalArrangement = Arrangement.spacedBy(AapsSpacing.medium)
-                ) {
-                    state.allCategories.forEach { cat ->
-                        FilterChip(
-                            selected = state.filterCategory == cat,
-                            onClick = {
-                                viewModel.setFilterCategory(if (state.filterCategory == cat) null else cat)
-                            },
-                            label = { Text(cat) }
-                        )
-                    }
-                }
-                if (filteredSubCategories.isNotEmpty() && state.filterCategory != null) {
-                    FlowRow(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = AapsSpacing.extraLarge),
-                        horizontalArrangement = Arrangement.spacedBy(AapsSpacing.medium)
-                    ) {
-                        filteredSubCategories.forEach { sub ->
-                            FilterChip(
-                                selected = state.filterSubCategory == sub,
-                                onClick = {
-                                    viewModel.setFilterSubCategory(if (state.filterSubCategory == sub) null else sub)
-                                },
-                                label = { Text(sub) }
-                            )
-                        }
-                    }
-                }
-            }
+            // Category and subcategory filters, and the sort: one row of fixed height, whatever the
+            // number of groups.
+            GroupFilterRow(
+                categories = categoryChoices,
+                subCategories = subCategoryChoices,
+                category = state.filterCategory,
+                subCategory = state.filterSubCategory,
+                onCategory = viewModel::setFilterCategory,
+                onSubCategory = viewModel::setFilterSubCategory,
+                sortByName = state.sortFoodsByName,
+                onSortByName = viewModel::setSortFoodsByName,
+            )
 
             // Food list
             if (state.isLoading) {
