@@ -99,6 +99,9 @@ class GraphScopeStabilityTest {
             "alarmSoundPlayer",
             "appRepository",
             "appScope",
+            // Since Metro 1.6.0 the graph keeps one map of providers. Each provider still makes a new
+            // view model on every call - `ContributedViewModelsTest` checks that.
+            "assistedFactoryProviders",
             "authFlowOut",
             "authorizedClientsRepository",
             "automation",
@@ -232,6 +235,7 @@ class GraphScopeStabilityTest {
             "userEntryLogger",
             "userEntryPresentationHelper",
             "versionCheckerUtils",
+            "viewModelProviders", // one map since Metro 1.6.0, see assistedFactoryProviders
             "visibilityContext",
             "wearPlugin",
             "wizardExecutor",
@@ -244,7 +248,6 @@ class GraphScopeStabilityTest {
         /** Deliberately a new instance per read. */
         val FRESH_EACH_READ = setOf(
             "apsResult",
-            "assistedFactoryProviders",
             "autosensData",
             "bolusWizard",
             "cloudStorageProviders",
@@ -260,7 +263,6 @@ class GraphScopeStabilityTest {
             "pumpSync",
             "pumpWithConcentration",
             "sourceGraph",
-            "viewModelProviders",
             "workersGraph",
         )
 
