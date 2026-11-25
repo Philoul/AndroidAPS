@@ -9,7 +9,6 @@ import app.aaps.core.data.model.FD
 import app.aaps.core.data.model.IDs
 import app.aaps.core.data.ue.Action
 import app.aaps.core.data.ue.Sources
-import app.aaps.core.interfaces.InterfacesStrings
 import app.aaps.core.interfaces.concurrent.aapsIoDispatcher
 import app.aaps.core.interfaces.db.PersistenceLayer
 import app.aaps.core.interfaces.db.observeChanges
@@ -21,11 +20,9 @@ import app.aaps.core.interfaces.utils.DecimalFormatter
 import app.aaps.core.keys.BooleanNonKey
 import app.aaps.core.keys.interfaces.Preferences
 import app.aaps.core.keys.interfaces.TextRef
-import app.aaps.core.ui.CoreUiStrings
 import app.aaps.core.ui.compose.SelectableListToolbar
 import app.aaps.core.ui.compose.ToolbarConfig
 import app.aaps.ui.UiStrings
-import app.aaps.ui.compose.foodManagement.book.EatenItem
 import app.aaps.ui.compose.foodManagement.book.EatenMeal
 import app.aaps.ui.compose.foodManagement.book.ExportFile
 import app.aaps.ui.compose.foodManagement.book.FileResult
@@ -701,20 +698,9 @@ class FoodManagementViewModel(
         return state.quantityRecipe?.let { recipe -> nutritionOf(recipe)?.carbs?.times(quantity) }
     }
 
-    private fun foodLine(food: FD, quantity: Double): MealItem {
-        val nutrition = FoodBookMath.nutritionOf(food, quantity)
-        return MealItem(
-            key = nextMealKey++,
-            name = food.name,
-            quantity = quantity,
-            unit = if (food.portion > 0) food.unit else rh.gs(UiStrings.food_meal_portions),
-            carbs = nutrition.carbs,
-            fat = nutrition.fat,
-            protein = nutrition.protein,
-            energyKj = nutrition.energyKj,
-            foodId = food.id,
-        )
-    }
+    private fun mealLines() = MealLines(rh, foodsById(), recipesById()) { nextMealKey++ }
+
+    private fun foodLine(food: FD, quantity: Double): MealItem = mealLines().foodLine(food, quantity)
 
     // ---- A line typed by hand: a name and estimated carbs, without a food (a home-made quiche) ----
 
@@ -744,9 +730,7 @@ class FoodManagementViewModel(
         }
     }
 
-    /** Fat, protein and energy are not known for a line typed by hand, so the meal shows them as not known. */
-    private fun handLine(name: String, carbs: Double, key: Long = nextMealKey++) =
-        MealItem(key = key, name = name, quantity = 1.0, unit = "", carbs = carbs, estimated = true)
+    private fun handLine(name: String, carbs: Double, key: Long = nextMealKey++) = mealLines().handLine(name, carbs, key)
 
     fun removeMealItem(key: Long) = _uiState.update { s ->
         val items = s.mealItems.filterNot { it.key == key }
@@ -791,29 +775,12 @@ class FoodManagementViewModel(
     /** Asks how many servings of a dish go into the meal. */
     fun askQuantity(recipe: Recipe) = _uiState.update { it.copy(quantityFood = null, quantityRecipe = recipe, quantityLineKey = null, quantityText = "1") }
 
-    private fun recipeLine(recipe: Recipe, servings: Double): MealItem? {
-        val nutrition = nutritionOf(recipe)?.times(servings) ?: return null
-        return MealItem(
-            key = nextMealKey++,
-            name = recipe.name,
-            quantity = servings,
-            unit = rh.gs(UiStrings.food_book_servings),
-            carbs = nutrition.carbs,
-            fat = nutrition.fat,
-            protein = nutrition.protein,
-            energyKj = nutrition.energyKj,
-            recipeId = recipe.id,
-            partial = nutrition.partial,
-        )
-    }
+    private fun recipeLine(recipe: Recipe, servings: Double): MealItem? = mealLines().recipeLine(recipe, servings)
 
     /** The lines of a dish or meal as meal lines, or null when one of them cannot be computed. */
-    private fun linesOf(recipe: Recipe): List<MealItem>? = recipe.items.map { item -> lineOf(item) ?: return null }
+    private fun linesOf(recipe: Recipe): List<MealItem>? = mealLines().linesOf(recipe)
 
-    private fun lineOf(item: RecipeItem): MealItem? =
-        item.estimatedCarbs?.let { handLine(item.name, it) }
-            ?: item.foodId?.let { id -> foodsById()[id]?.takeUnless { FoodBookMath.unitChanged(item, it) }?.let { foodLine(it, item.quantity) } }
-            ?: item.recipeId?.let { id -> recipesById()[id]?.let { recipeLine(it, item.quantity) } }
+    private fun lineOf(item: RecipeItem): MealItem? = mealLines().lineOf(item)
 
     /**
      * The lines of a dish or meal to change it. A line that cannot be computed any more is kept,
@@ -1033,27 +1000,9 @@ class FoodManagementViewModel(
     private fun lineKey(item: MealItem) = Triple(item.name, item.quantity, item.unit)
 
     private fun record(items: List<MealItem>, name: String?, target: MealTarget, changed: Boolean = false, photo: String? = null): Pair<String, Pair<Int, String>> {
-        val recipes = recipesById()
-        val carbs = MealMath.wizardCarbs(items)
-        val note = noteFor(items)
-        val meal = EatenMeal(
-            id = Uuid.random().toString(),
-            timestamp = dateUtil.now(),
-            name = name,
-            note = note,
-            wizardCarbs = carbs,
-            items = items.map {
-                EatenItem(
-                    it.name, it.quantity, it.unit, it.carbs, it.fat, it.protein, it.energyKj, estimated = it.estimated, foodId = it.foodId, recipeId = it.recipeId,
-                    photo = it.recipeId?.let { id -> recipes[id]?.photo }, partial = it.partial
-                )
-            },
-            target = target,
-            changed = changed,
-            photo = photo,
-        )
+        val meal = mealLines().eatenMeal(items, name, target, dateUtil.now(), changed, photo)
         viewModelScope.launch { foodBook.addEatenMeal(meal) }
-        return meal.id to (carbs to note)
+        return meal.id to (meal.wizardCarbs to meal.note)
     }
 
     fun timeText(timestamp: Long): String = dateUtil.dateAndTimeString(timestamp)
@@ -1133,18 +1082,7 @@ class FoodManagementViewModel(
      */
     fun mealNote(): String = noteFor(uiState.value.mealItems)
 
-    private fun noteFor(items: List<MealItem>): String =
-        items
-            .map { item ->
-                rh.gs(
-                    UiStrings.food_meal_note_item,
-                    item.name,
-                    if (item.estimated) rh.gs(UiStrings.food_meal_estimated) else rh.gs(CoreUiStrings.value_with_unit, MealMath.formatAmount(item.quantity), item.unit),
-                    rh.gs(InterfacesStrings.format_carbs, item.carbs.roundToInt())
-                )
-            }
-            .reduceOrNull { acc, next -> rh.gs(UiStrings.food_meal_note_join, acc, next) }
-            .orEmpty()
+    private fun noteFor(items: List<MealItem>): String = mealLines().noteFor(items)
 
     fun closeEditor() {
         _uiState.update { it.copy(showEditor = false) }
