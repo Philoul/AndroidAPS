@@ -21,6 +21,8 @@ enum class ArgType {
     PROFILE_NAME,
     SCENE_ID,
     GLUCOSE_TARGET,
+    FOOD_ITEM,
+    FOOD_TARGET,
     BOLUS_WIZARD_OPTIONS // Special composite type for calculator toggles
 }
 
@@ -75,6 +77,7 @@ enum class NfcCommandCode(
     BOLUS(NfcCategory.TREATMENTS),
     CARBS(NfcCategory.TREATMENTS),
     BOLUS_WIZARD(NfcCategory.TREATMENTS),
+    FOOD(NfcCategory.TREATMENTS),
     EXTENDED_STOP(NfcCategory.TREATMENTS),
     EXTENDED_SET(NfcCategory.TREATMENTS),
     

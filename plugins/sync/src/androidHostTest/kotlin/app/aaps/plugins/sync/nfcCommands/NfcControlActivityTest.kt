@@ -73,7 +73,8 @@ class NfcControlActivityTest : TestBaseWithProfile() {
                 sceneAutomationApi = mock(),
                 sceneIconResolver = mock(),
                 uel = mock(),
-                masterActionExecutor = mock()
+                masterActionExecutor = mock(),
+                foodCatalogs = emptySet()
             ),
         )
         // The base class resolves the plugin name through the mocked rh when the plugin is enabled.

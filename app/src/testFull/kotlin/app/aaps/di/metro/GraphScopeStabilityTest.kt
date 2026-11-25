@@ -146,6 +146,7 @@ class GraphScopeStabilityTest {
             "fabricPrivacy",
             "fabricPrivacyImpl",
             "fileListProvider",
+            "foodCatalogs",
             "glucoseStatusCalculatorAutoIsf",
             "glucoseStatusCalculatorSMB",
             "glucoseStatusProvider",

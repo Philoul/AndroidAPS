@@ -70,6 +70,7 @@ import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -88,6 +89,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.aaps.core.data.format.NumberFormat
 import app.aaps.core.data.model.GlucoseUnit
 import app.aaps.core.interfaces.InterfacesStrings
+import app.aaps.core.interfaces.food.FoodChoice
+import app.aaps.core.interfaces.food.FoodItemKind
+import app.aaps.core.interfaces.food.FoodItemRef
+import app.aaps.core.interfaces.food.FoodSendTarget
 import app.aaps.core.interfaces.logging.LTag
 import app.aaps.core.interfaces.navigation.ElementType
 import app.aaps.core.keys.DoubleKey
@@ -140,6 +145,8 @@ fun NfcBuildScreen(
     val sceneNames = remember(scenesJson) {
         plugin.sceneAutomationApi.getScenes().map { it.id to it.name }
     }
+
+    val foodChoices by produceState(emptyList<FoodChoice>()) { value = plugin.actionFactory.foodChoices() }
 
     val state = rememberNfcBuildState()
 
@@ -503,6 +510,7 @@ fun NfcBuildScreen(
                         action = action,
                         profileNames = profileNames,
                         sceneNames = sceneNames,
+                        foodChoices = foodChoices,
                         onRemove = { state.chain.removeAt(index) }
                     )
                 }
@@ -561,6 +569,7 @@ private fun InlineActionCard(
     action: NfcUiAction,
     profileNames: List<String>,
     sceneNames: List<Pair<String, String>>,
+    foodChoices: List<FoodChoice>,
     onRemove: () -> Unit
 ) {
     val meta = action.meta
@@ -601,7 +610,7 @@ private fun InlineActionCard(
                 }
             }
             Column(modifier = Modifier.padding(bottom = 8.dp)) {
-                action.EditContent(profileNames, sceneNames) {
+                action.EditContent(profileNames, sceneNames, foodChoices) {
                     action.meta.params = action.getParams()
                 }
             }
@@ -812,7 +821,7 @@ interface NfcUiAction {
     val meta: NfcAction
     fun shortDescription(): String
     @Composable
-    fun EditContent(profileNames: List<String>, sceneNames: List<Pair<String, String>>, onChange: () -> Unit)
+    fun EditContent(profileNames: List<String>, sceneNames: List<Pair<String, String>>, foodChoices: List<FoodChoice>, onChange: () -> Unit)
 
     fun applyParams(params: NfcParams)
 
@@ -848,6 +857,10 @@ class GenericNfcUiAction(
     var meal by mutableStateOf(false)
     var profileName by mutableStateOf("")
     var sceneId by mutableStateOf("")
+    var foodKind by mutableStateOf<FoodItemKind?>(null)
+    var foodId by mutableStateOf<String?>(null)
+    var foodName by mutableStateOf<String?>(null)
+    var foodTarget by mutableStateOf(FoodSendTarget.CARBS)
 
     // Bolus Wizard calculation toggles
     var useBg by mutableStateOf(true)
@@ -871,6 +884,8 @@ class GenericNfcUiAction(
                 ArgType.MEAL_CHECK           -> p.copy(isMeal = meal)
                 ArgType.PROFILE_NAME         -> p.copy(profileName = profileName)
                 ArgType.SCENE_ID             -> p.copy(sceneId = sceneId)
+                ArgType.FOOD_ITEM            -> p.copy(foodKind = foodKind, foodId = foodId, foodName = foodName)
+                ArgType.FOOD_TARGET          -> p.copy(foodTarget = foodTarget)
                 ArgType.GLUCOSE_TARGET       -> p.copy(glucose = glucose)
                 ArgType.BOLUS_WIZARD_OPTIONS -> p.copy(
                     useBg = useBg, useTt = useTT, useTrend = useTrend, useIob = useIOB, useCob = useCOB
@@ -897,6 +912,12 @@ class GenericNfcUiAction(
                     ArgType.MEAL_CHECK           -> meal = params.isMeal
                     ArgType.PROFILE_NAME         -> profileName = params.profileName ?: profileName
                     ArgType.SCENE_ID             -> sceneId = params.sceneId ?: sceneId
+                    ArgType.FOOD_ITEM            -> {
+                        foodKind = params.foodKind ?: foodKind
+                        foodId = params.foodId ?: foodId
+                        foodName = params.foodName ?: foodName
+                    }
+                    ArgType.FOOD_TARGET          -> foodTarget = params.foodTarget ?: foodTarget
                     ArgType.GLUCOSE_TARGET       -> glucose = params.glucose ?: glucose
 
                     ArgType.BOLUS_WIZARD_OPTIONS -> {
@@ -918,7 +939,7 @@ class GenericNfcUiAction(
      * Dynamically renders the input fields required for this specific action.
      */
     @Composable
-    override fun EditContent(profileNames: List<String>, sceneNames: List<Pair<String, String>>, onChange: () -> Unit) {
+    override fun EditContent(profileNames: List<String>, sceneNames: List<Pair<String, String>>, foodChoices: List<FoodChoice>, onChange: () -> Unit) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             if (argTypes.isEmpty()) {
                 Text(
@@ -928,7 +949,11 @@ class GenericNfcUiAction(
                 )
             }
             
-            argTypes.forEach { type ->
+            // The food command sends a carbs entry or uses the wizard: the wizard settings are shown
+            // only for the wizard.
+            val hidden = if (command == NfcCommandCode.FOOD && foodTarget == FoodSendTarget.CARBS)
+                setOf(ArgType.BOLUS_WIZARD_OPTIONS, ArgType.PERCENT) else emptySet()
+            argTypes.filterNot { it in hidden }.forEach { type ->
                 when (type) {
                     ArgType.INSULIN -> InsulinInputRow(plugin, units) { units = it; onChange() }
                     ArgType.AMOUNT_GRAMS -> AmountGramsInputRow(plugin, grams) { grams = it; onChange() }
@@ -965,6 +990,13 @@ class GenericNfcUiAction(
                         label = stringResource(CoreUiStrings.scenes)
                     )
                     ArgType.GLUCOSE_TARGET -> GlucoseInputRow(plugin, glucose) { glucose = it; onChange() }
+                    ArgType.FOOD_ITEM -> FoodItemPicker(
+                        choices = foodChoices,
+                        selected = foodKind?.let { kind -> foodId?.let { FoodItemRef(kind, it) } },
+                        storedName = foodName,
+                        onSelect = { foodKind = it.ref.kind; foodId = it.ref.id; foodName = it.name; onChange() }
+                    )
+                    ArgType.FOOD_TARGET -> FoodTargetRow(foodTarget) { foodTarget = it; onChange() }
                     ArgType.BOLUS_WIZARD_OPTIONS -> CalculatorOptions(useBg, useTT, useTrend, useIOB, useCOB,
                         onBgChange = { useBg = it; onChange() },
                         onTTChange = { useTT = it; onChange() },

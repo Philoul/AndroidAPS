@@ -10,6 +10,13 @@ import app.aaps.core.interfaces.InterfacesStrings
 import app.aaps.core.interfaces.bolus.MasterActionExecutor
 import app.aaps.core.interfaces.configuration.ConfigBuilder
 import app.aaps.core.interfaces.db.PersistenceLayer
+import app.aaps.core.interfaces.food.FoodCatalog
+import app.aaps.core.interfaces.food.FoodChoice
+import app.aaps.core.interfaces.food.FoodItemKind
+import app.aaps.core.interfaces.food.FoodItemRef
+import app.aaps.core.interfaces.food.FoodSendTarget
+import app.aaps.core.interfaces.food.PreparedMeal
+import app.aaps.core.interfaces.pump.DetailedBolusInfo
 import app.aaps.core.interfaces.iob.GlucoseStatusProvider
 import app.aaps.core.interfaces.logging.UserEntryLogger
 import app.aaps.core.interfaces.profile.ProfileStore
@@ -59,6 +66,8 @@ class NfcCommandsPluginTest : TestBaseWithProfile() {
 
     private val tagUid = "aabbccdd"
     private val runtimeState = NfcRuntimeState()
+    /** Empty: this build has no food library. A food test adds one before it runs a command. */
+    private val foodCatalogs = mutableSetOf<FoodCatalog>()
     private lateinit var plugin: NfcCommandsPlugin
 
     @BeforeEach
@@ -110,7 +119,8 @@ class NfcCommandsPluginTest : TestBaseWithProfile() {
                     sceneAutomationApi = sceneAutomationApi,
                     sceneIconResolver = sceneIconResolver,
                     uel = uel,
-                    masterActionExecutor = masterActionExecutor
+                    masterActionExecutor = masterActionExecutor,
+                    foodCatalogs = foodCatalogs
                 ),
             )
         // The base class resolves the plugin name through the mocked rh when the plugin is enabled.
@@ -759,6 +769,94 @@ class NfcCommandsPluginTest : TestBaseWithProfile() {
      * single argument form, and it cannot tell two calls apart by the values passed. Name them
      * apart instead, which is clearer anyway, and let the assertions check the values.
      */
+    // ── food command ───────────────────────────────────────────────────────────
+
+    private val breakfast = FoodItemRef(FoodItemKind.MEAL, "meal-1")
+    private val breakfastMeal = PreparedMeal(breakfast, "Breakfast", carbs = 45, note = "Bread 80 g (40 g), Milk 100 ml (5 g)")
+
+    private fun foodParams(target: FoodSendTarget = FoodSendTarget.CARBS) =
+        NfcParams(foodKind = breakfast.kind, foodId = breakfast.id, foodName = "Breakfast", foodTarget = target, percent = 100)
+
+    private fun addFoodCatalog(meal: PreparedMeal?): FoodCatalog {
+        val catalog: FoodCatalog = mock()
+        runTest {
+            whenever(catalog.choices()).thenReturn(listOf(FoodChoice(breakfast, "Breakfast", 45.0)))
+            whenever(catalog.prepare(breakfast)).thenReturn(meal)
+        }
+        foodCatalogs += catalog
+        return catalog
+    }
+
+    @Test
+    fun `food command is not offered when the build has no food library`() {
+        val categories = NfcCategories.build(plugin.actionFactory)
+
+        assertThat(categories.flatMap { it.commands }).doesNotContain(NfcCommandCode.FOOD)
+    }
+
+    @Test
+    fun `food command is offered in the treatments when there is a food library`() {
+        addFoodCatalog(breakfastMeal)
+
+        val categories = NfcCategories.build(plugin.actionFactory)
+
+        assertThat(categories.find { it.label == CoreUiStrings.treatments }?.commands).contains(NfcCommandCode.FOOD)
+    }
+
+    @Test
+    fun `food command sends the carbs of the meal with its note and keeps the meal in the history`() {
+        val catalog = addFoodCatalog(breakfastMeal)
+        whenever(constraintsChecker.applyCarbsConstraints(any())).thenReturn(
+            app.aaps.core.objects.constraints.ConstraintObject(45, aapsLogger),
+        )
+
+        val result = execute(NfcCommandCode.FOOD, foodParams())
+
+        assertThat(result.success).isTrue()
+        runTest {
+            verify(commandQueue).bolus(argThat<DetailedBolusInfo> { carbs == 45.0 && notes == breakfastMeal.note })
+            verify(catalog).recordSent(eq(breakfastMeal), eq(FoodSendTarget.CARBS), any())
+        }
+    }
+
+    @Test
+    fun `food command fails like a missing profile when the item is not in the library any more`() {
+        val catalog = addFoodCatalog(null)
+
+        val result = execute(NfcCommandCode.FOOD, foodParams())
+
+        assertThat(result.success).isFalse()
+        runTest {
+            verify(commandQueue, never()).bolus(any())
+            verify(catalog, never()).recordSent(any(), any(), any())
+        }
+    }
+
+    @Test
+    fun `food command does not keep the meal when the carbs are not saved`() {
+        val catalog = addFoodCatalog(breakfastMeal)
+        whenever(constraintsChecker.applyCarbsConstraints(any())).thenReturn(
+            app.aaps.core.objects.constraints.ConstraintObject(45, aapsLogger),
+        )
+        runTest { whenever(commandQueue.bolus(any())).thenReturn(pumpEnactResultProvider().success(false)) }
+
+        val result = execute(NfcCommandCode.FOOD, foodParams())
+
+        assertThat(result.success).isFalse()
+        runTest { verify(catalog, never()).recordSent(any(), any(), any()) }
+    }
+
+    @Test
+    fun `food command with no item stored is refused`() {
+        addFoodCatalog(breakfastMeal)
+        whenever(rh.gs(SyncStrings.nfccommands_command_incomplete)).thenReturn("Command incomplete")
+
+        val result = execute(NfcCommandCode.FOOD, NfcParams(foodTarget = FoodSendTarget.CARBS, percent = 100))
+
+        assertThat(result.success).isFalse()
+        assertThat(result.message).isEqualTo("Command incomplete")
+    }
+
     private fun refNamed(ref: TextRef): TextRef = argThat { actual ->
         actual is TextRef.Named && ref is TextRef.Named && actual.owner == ref.owner && actual.name == ref.name
     }
