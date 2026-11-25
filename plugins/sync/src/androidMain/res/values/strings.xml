@@ -390,6 +390,16 @@
     <string name="nfccommands_cmd_loop_stop">Stop Loop</string>
     <string name="nfccommands_cmd_loop_close">Close Loop</string>
     <string name="nfccommands_cmd_run_scene">Run Scene</string>
+    <string name="nfccommands_cmd_food">Food</string>
+    <string name="nfccommands_food_item">Food, dish or meal</string>
+    <string name="nfccommands_food_send_to">Send to</string>
+    <string name="nfccommands_food_library_empty">The food library is empty. Add a food, a dish or a meal in the Food screen first.</string>
+    <string name="nfccommands_food_kind_food">Food</string>
+    <string name="nfccommands_food_kind_dish">Dish</string>
+    <string name="nfccommands_food_kind_meal">Meal</string>
+    <string name="nfccommands_food_choice" comment="%1$s=name of a food, dish or meal, %2$s=its kind (Food, Dish or Meal), %3$s=its carbs with unit. Example: Breakfast (Meal) – 45 g">%1$s (%2$s) – %3$s</string>
+    <string name="nfccommands_food_summary" comment="%1$s=name of a food, dish or meal, %2$s=what is sent, for example 45 g or the insulin of the bolus wizard. Example: Breakfast: 45 g">%1$s: %2$s</string>
+    <string name="nfccommands_food_not_found" comment="%1$s=name of a food, dish or meal stored on the NFC tag">%1$s is not in the food library any more</string>
     <string name="nfccommands_cmd_aapsclient_restart">Restart AAPSClient</string>
     <string name="nfccommands_cmd_pump_connect">Connect Pump</string>
     <string name="nfccommands_cmd_pump_disconnect">Disconnect Pump</string>

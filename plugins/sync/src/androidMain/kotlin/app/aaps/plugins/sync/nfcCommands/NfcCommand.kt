@@ -1,5 +1,7 @@
 package app.aaps.plugins.sync.nfcCommands
 
+import app.aaps.core.interfaces.food.FoodItemKind
+import app.aaps.core.interfaces.food.FoodSendTarget
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -68,6 +70,14 @@ data class NfcParams(
     val rate: Double? = null,
     val profileName: String? = null,
     val sceneId: String? = null,
+    /** Food command: the kind of the item of the food library. */
+    val foodKind: FoodItemKind? = null,
+    /** Food command: the id of the item, see `FoodItemRef`. */
+    val foodId: String? = null,
+    /** Food command: the name of the item when the tag was written, shown when it is not found. */
+    val foodName: String? = null,
+    /** Food command: send the item as a carbs entry or to the bolus wizard. */
+    val foodTarget: FoodSendTarget? = null,
     /** Bolus only: also start an Eating Soon temporary target. */
     val isMeal: Boolean = false,
 

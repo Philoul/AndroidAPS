@@ -20,5 +20,7 @@ internal fun ArgType.isSetIn(params: NfcParams): Boolean = when (this) {
     // A blank name is as useless as no name, so it counts as missing.
     ArgType.PROFILE_NAME                                 -> !params.profileName.isNullOrBlank()
     ArgType.SCENE_ID                                     -> !params.sceneId.isNullOrBlank()
+    ArgType.FOOD_ITEM                                    -> params.foodKind != null && !params.foodId.isNullOrBlank()
+    ArgType.FOOD_TARGET                                  -> params.foodTarget != null
     ArgType.MEAL_CHECK, ArgType.BOLUS_WIZARD_OPTIONS, ArgType.NONE -> true
 }

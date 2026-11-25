@@ -49,6 +49,12 @@ class BolusWizardAction(
     override val icon
         get() = elementType.icon()
 
+    /**
+     * Stored with the bolus calculation instead of the tag name. Set by the food command, so the meal
+     * history finds the calculation.
+     */
+    var treatmentNote: String? = null
+
     override suspend fun getDefaultParams(): NfcParams {
         val useTrend = preferences.get(BooleanNonKey.WizardIncludeTrend)
         val useCOB = preferences.get(BooleanNonKey.WizardIncludeCob)
@@ -150,7 +156,7 @@ class BolusWizardAction(
                 useTt = useTT,
                 useTrend = useTrend,
                 alarm = false,
-                notes = tagName,
+                notes = treatmentNote ?: tagName,
                 source = source
             )
         )

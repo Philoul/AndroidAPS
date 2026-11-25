@@ -4,6 +4,8 @@ import app.aaps.core.interfaces.aps.Loop
 import app.aaps.core.interfaces.bolus.MasterActionExecutor
 import app.aaps.core.interfaces.constraints.ConstraintsChecker
 import app.aaps.core.interfaces.db.PersistenceLayer
+import app.aaps.core.interfaces.food.FoodCatalog
+import app.aaps.core.interfaces.food.FoodChoice
 import app.aaps.core.interfaces.iob.GlucoseStatusProvider
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.UserEntryLogger
@@ -25,6 +27,7 @@ import app.aaps.plugins.sync.nfcCommands.actions.BolusWizardAction
 import app.aaps.plugins.sync.nfcCommands.actions.CarbsAction
 import app.aaps.plugins.sync.nfcCommands.actions.ExtendedCancelAction
 import app.aaps.plugins.sync.nfcCommands.actions.ExtendedSetAction
+import app.aaps.plugins.sync.nfcCommands.actions.FoodAction
 import app.aaps.plugins.sync.nfcCommands.actions.LoopClosedAction
 import app.aaps.plugins.sync.nfcCommands.actions.LoopLgsAction
 import app.aaps.plugins.sync.nfcCommands.actions.LoopResumeAction
@@ -82,7 +85,9 @@ class NfcActionFactory(
     private val sceneAutomationApi: SceneAutomationApi,
     private val sceneIconResolver: SceneIconResolver,
     private val uel: UserEntryLogger,
-    private val masterActionExecutor: MasterActionExecutor
+    private val masterActionExecutor: MasterActionExecutor,
+    /** Empty in a build without a food library: the food command is then not offered. */
+    private val foodCatalogs: Set<FoodCatalog>
 ) {
 
     /** The action for [code], with its parameters unset. */
@@ -98,8 +103,9 @@ class NfcActionFactory(
         NfcCommandCode.BASAL_ABS       -> TempBasalAbsoluteAction(aapsLogger, rh, uel, activePlugin, commandQueue, constraintChecker, profileFunction)
         NfcCommandCode.BASAL_PCT       -> TempBasalPercentAction(aapsLogger, rh, uel, activePlugin, commandQueue, constraintChecker, profileFunction)
         NfcCommandCode.BOLUS           -> BolusAction(aapsLogger, rh, uel, bolusProgressData, commandQueue, constraintChecker, dateUtil, loop, persistenceLayer, preferences, profileFunction, profileUtil, runtimeState)
-        NfcCommandCode.CARBS           -> CarbsAction(aapsLogger, rh, uel, commandQueue, constraintChecker, dateUtil)
-        NfcCommandCode.BOLUS_WIZARD    -> BolusWizardAction(aapsLogger, rh, uel, commandQueue, dateUtil, glucoseStatusProvider, loop, persistenceLayer, preferences, profileUtil, runtimeState, masterActionExecutor)
+        NfcCommandCode.CARBS           -> carbsAction()
+        NfcCommandCode.BOLUS_WIZARD    -> bolusWizardAction()
+        NfcCommandCode.FOOD            -> FoodAction(aapsLogger, rh, uel, foodCatalogs.firstOrNull(), carbsAction(), bolusWizardAction(), dateUtil)
         NfcCommandCode.EXTENDED_STOP   -> ExtendedCancelAction(aapsLogger, rh, uel, commandQueue)
         NfcCommandCode.EXTENDED_SET    -> ExtendedSetAction(aapsLogger, rh, uel, commandQueue, constraintChecker, decimalFormatter)
         NfcCommandCode.PROFILE_SWITCH  -> ProfileSwitchAction(aapsLogger, rh, uel, dateUtil, profileFunction, profileRepository)
@@ -110,4 +116,12 @@ class NfcActionFactory(
         NfcCommandCode.TARGET_MANUAL   -> TempTargetManualAction(aapsLogger, rh, uel, dateUtil, decimalFormatter, persistenceLayer, profileFunction, profileUtil)
         NfcCommandCode.TARGET_STOP     -> TempTargetCancelAction(aapsLogger, rh, uel, dateUtil, persistenceLayer)
     }
+
+    /** The items of the food library, for the food command. Empty when this build has none. */
+    suspend fun foodChoices(): List<FoodChoice> = foodCatalogs.firstOrNull()?.choices().orEmpty()
+
+    private fun carbsAction() = CarbsAction(aapsLogger, rh, uel, commandQueue, constraintChecker, dateUtil)
+
+    private fun bolusWizardAction() =
+        BolusWizardAction(aapsLogger, rh, uel, commandQueue, dateUtil, glucoseStatusProvider, loop, persistenceLayer, preferences, profileUtil, runtimeState, masterActionExecutor)
 }

@@ -34,6 +34,9 @@ class CarbsAction(
     override val icon
         get() = elementType.icon()
 
+    /** Stored with the carbs entry. Set by the food command, so the meal history finds the entry. */
+    var treatmentNote: String? = null
+
     override suspend fun getDefaultParams() = NfcParams(carbs = NfcDefaults.CARBS_GRAMS)
 
     override suspend fun formatParams(tagName: String): String {
@@ -51,6 +54,7 @@ class CarbsAction(
         val detailedBolusInfo = DetailedBolusInfo().apply {
             carbs = grams.toDouble()
             timestamp = dateUtil.now()
+            notes = treatmentNote
         }
         val result = commandQueue.bolus(detailedBolusInfo)
         if (result.success) {
