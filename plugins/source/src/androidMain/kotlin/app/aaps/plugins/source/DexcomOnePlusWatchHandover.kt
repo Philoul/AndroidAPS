@@ -77,6 +77,8 @@ class DexcomOnePlusWatchHandover(
 
     @Volatile private var lastCorrectionAtMs = 0L
 
+    @Volatile private var lastLoggedWatchReadingAt = 0L
+
     private val _report = MutableStateFlow<DexcomOnePlusWatchReport?>(null)
 
     /** The watch's last report, for the Status screen. Null until the watch has said anything. */
@@ -156,6 +158,14 @@ class DexcomOnePlusWatchHandover(
         val previous = _report.value?.status
         _report.value = DexcomOnePlusWatchReport(status, now)
         if (previous?.state != status.state) aapsLogger.info(LTag.BGSOURCE, "DEXCOM_ONEPLUS_WATCH: watch reports ${status.state}")
+        // One line per reading the watch took from the sensor itself. A reading the watch missed never
+        // shows here, also when the sensor's backfill brings it later: only the newest time is reported.
+        // The backfill copy of a reading can be a few seconds newer than the live one: not a new reading.
+        val readingAt = status.latestReadingAt
+        if (readingAt != null && readingAt - lastLoggedWatchReadingAt > SAME_WATCH_READING_MS) {
+            lastLoggedWatchReadingAt = readingAt
+            aapsLogger.info(LTag.BGSOURCE, "DEXCOM_ONEPLUS_WATCH: watch read the sensor ts=$readingAt ageS=${(now - readingAt) / 1000}")
+        }
         if (DexcomOnePlusWatchDirectRules.shouldCorrect(wanted(), status, lastCorrectionAtMs, now)) {
             lastCorrectionAtMs = now
             resend("watch is out of step")
@@ -176,5 +186,11 @@ class DexcomOnePlusWatchHandover(
         aapsLogger.info(LTag.BGSOURCE, "DEXCOM_ONEPLUS_WATCH: ${message.readings.size} readings from the watch, ${accepted.size} may feed the loop")
         if (accepted.isEmpty()) return
         onWatchReadings(accepted.map { OnePlusGlucoseSample(it.mgdl, it.timestamp, it.slopeMgdlPerMin, sequence = null, displaySlot = OnePlusDisplaySlot.WATCH) })
+    }
+
+    private companion object {
+
+        /** Two reading times from the watch that are closer than this are the same reading. */
+        const val SAME_WATCH_READING_MS = 60_000L
     }
 }
